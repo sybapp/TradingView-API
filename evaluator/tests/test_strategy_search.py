@@ -104,7 +104,7 @@ class StrategySearchTests(unittest.TestCase):
                 templates=[template],
                 cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
                 registry_path=registry_path,
-                walk_forward=WalkForwardConfig(training_bars=2, scoring_bars=4, step_bars=6),
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1, step_sessions=2),
                 fitness_constraints=FitnessConstraints(min_trades=1, min_profitable_windows=1),
                 search_config=BoundedSearchConfig(method="optuna_style", max_candidates=4, seed=11),
             )
@@ -149,7 +149,7 @@ class StrategySearchTests(unittest.TestCase):
                 proposed_candidates=[invalid_proposal, valid_proposal],
                 cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
                 registry_path=Path(temp_dir) / "run-registry",
-                walk_forward=WalkForwardConfig(training_bars=2, scoring_bars=4),
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1),
                 fitness_constraints=FitnessConstraints(min_trades=0, min_profitable_windows=0),
                 search_config=BoundedSearchConfig(method="deterministic", max_candidates=4),
             )
@@ -161,6 +161,8 @@ class StrategySearchTests(unittest.TestCase):
 
 def _write_search_dataset(path: Path):
     path.mkdir()
+    session_dates = ["2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28"]
+    bars_per_session = 3
     manifest = {
         "schemaVersion": 1,
         "datasetId": "search-fixture",
@@ -168,22 +170,42 @@ def _write_search_dataset(path: Path):
         "source": {"kind": "tradingview"},
         "symbol": {"ticker": "CME_MINI:ES1!"},
         "bar": {"interval": "5m", "priceScale": 100},
-        "session": {"timezone": "UTC", "start": "13:30", "end": "23:59"},
+        "session": {
+            "timezone": "UTC",
+            "start": "13:30",
+            "end": "13:45",
+            "sessions": [
+                {
+                    "id": session_date,
+                    "firstBarTime": _session_bar_time(session_date, 0).isoformat().replace("+00:00", ".000Z"),
+                    "lastBarTime": _session_bar_time(session_date, bars_per_session - 1).isoformat().replace("+00:00", ".000Z"),
+                    "barCount": bars_per_session,
+                }
+                for session_date in session_dates
+            ],
+        },
     }
     prices = [100, 100, 100, 100, 100, 106, 100, 100, 100, 100, 100, 110]
-    start_time = datetime(2026, 6, 25, 13, 30, tzinfo=timezone.utc)
     bars = [
-        _bar((start_time + timedelta(minutes=5 * index)).isoformat().replace("+00:00", ".000Z"), price)
-        for index, price in enumerate(prices)
+        _bar(_session_bar_time(session_date, bar_index).isoformat().replace("+00:00", ".000Z"), price)
+        for session_index, session_date in enumerate(session_dates)
+        for bar_index, price in enumerate(
+            prices[session_index * bars_per_session : (session_index + 1) * bars_per_session]
+        )
     ]
     features = [
-        _direction_feature("feature-score-1", "2026-06-25T13:45:00.000Z", 1),
-        _direction_feature("feature-score-2", "2026-06-25T14:15:00.000Z", 1),
+        _direction_feature("feature-score-1", "2026-06-26T13:30:00.000Z", 1),
+        _direction_feature("feature-score-2", "2026-06-28T13:30:00.000Z", 1),
     ]
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "bars.json").write_text(json.dumps(bars), encoding="utf-8")
     (path / "features.json").write_text(json.dumps(features), encoding="utf-8")
     return path
+
+
+def _session_bar_time(session_date: str, index: int) -> datetime:
+    date = datetime.fromisoformat(session_date)
+    return datetime(date.year, date.month, date.day, 13, 30, tzinfo=timezone.utc) + timedelta(minutes=5 * index)
 
 
 def _bar(timestamp: str, open_price: float):

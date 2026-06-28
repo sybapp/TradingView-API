@@ -54,8 +54,11 @@ class StrategyBacktestResult:
 
 @dataclass(frozen=True)
 class WalkForwardConfig:
-    training_bars: int
-    scoring_bars: int
+    training_sessions: Optional[int] = None
+    scoring_sessions: Optional[int] = None
+    step_sessions: Optional[int] = None
+    training_bars: Optional[int] = None
+    scoring_bars: Optional[int] = None
     step_bars: Optional[int] = None
 
 
@@ -75,6 +78,10 @@ class WindowRange:
     end: str
     start_index: int
     end_index: int
+    start_session_date: str
+    end_session_date: str
+    session_count: int
+    bar_count: int
 
 
 @dataclass(frozen=True)
@@ -87,6 +94,10 @@ class WalkForwardWindow:
 @dataclass(frozen=True)
 class WalkForwardWindowResult:
     window_id: str
+    start_session_date: str
+    end_session_date: str
+    session_count: int
+    bar_count: int
     orders: List[StrategyOrder]
     gross_pnl: int
     total_costs: int
@@ -94,6 +105,8 @@ class WalkForwardWindowResult:
     order_count: int
     trade_count: int
     max_drawdown: int
+    result_summary: Dict[str, Any]
+    nautilus_provenance: Dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -123,6 +136,14 @@ class PendingOrder:
     quantity: int
     reason: str
     signal_bar: NautilusBarInput
+
+
+@dataclass(frozen=True)
+class _DatasetSession:
+    session_id: str
+    session_date: str
+    start_index: int
+    end_index: int
 
 
 def run_strategy_backtest(
@@ -164,6 +185,8 @@ def run_walk_forward_backtest(
     walk_forward: WalkForwardConfig,
     fitness_constraints: FitnessConstraints,
 ) -> WalkForwardBacktestResult:
+    from .validation import run_nautilus_validation_dataset
+
     dataset = load_versioned_dataset(dataset_path)
     spec = validate_strategy_spec(strategy_spec)
     windows = _build_walk_forward_windows(dataset, walk_forward)
@@ -172,22 +195,20 @@ def run_walk_forward_backtest(
     scoring_window_results: List[WalkForwardWindowResult] = []
     for window in windows:
         training_dataset = _slice_dataset_for_window(dataset, window.training)
-        training_result = _evaluate_dataset_slice(
+        training_validation = run_nautilus_validation_dataset(
             dataset=training_dataset,
             spec=spec,
             cost_model=cost_model,
-            force_flat_at_end=True,
         )
-        training_window_results.append(_walk_forward_result(window.window_id, training_result))
+        training_window_results.append(_walk_forward_result(window.window_id, window.training, training_validation))
 
         scoring_dataset = _slice_dataset_for_window(dataset, window.scoring)
-        scoring_result = _evaluate_dataset_slice(
+        scoring_validation = run_nautilus_validation_dataset(
             dataset=scoring_dataset,
             spec=spec,
             cost_model=cost_model,
-            force_flat_at_end=True,
         )
-        scoring_window_results.append(_walk_forward_result(window.window_id, scoring_result))
+        scoring_window_results.append(_walk_forward_result(window.window_id, window.scoring, scoring_validation))
 
     fitness = _evaluate_fitness(scoring_window_results, fitness_constraints)
     record_path = _write_walk_forward_registry_record(
@@ -206,7 +227,7 @@ def run_walk_forward_backtest(
     return WalkForwardBacktestResult(
         dataset_id=dataset.dataset_id,
         strategy_id=spec.strategy_id,
-        engine="nautilus-compatible-walk-forward-replay",
+        engine="nautilus-trader-walk-forward-validation",
         windows=windows,
         training_window_results=training_window_results,
         window_results=scoring_window_results,
@@ -397,41 +418,135 @@ def _build_walk_forward_windows(
     dataset: VersionedDataset,
     config: WalkForwardConfig,
 ) -> List[WalkForwardWindow]:
-    if config.training_bars <= 1:
-        raise ValueError("walk_forward.training_bars must be greater than 1")
-    if config.scoring_bars <= 1:
-        raise ValueError("walk_forward.scoring_bars must be greater than 1")
-    step_bars = config.step_bars if config.step_bars is not None else config.scoring_bars
-    if step_bars <= 0:
-        raise ValueError("walk_forward.step_bars must be positive")
+    training_sessions, scoring_sessions, step_sessions = _normalized_walk_forward_sessions(config)
+    sessions = _dataset_sessions(dataset)
 
     windows: List[WalkForwardWindow] = []
-    start_index = 0
-    while start_index + config.training_bars + config.scoring_bars <= len(dataset.bars):
-        training_start = start_index
-        training_end = start_index + config.training_bars
+    start_session_index = 0
+    while start_session_index + training_sessions + scoring_sessions <= len(sessions):
+        training_start = start_session_index
+        training_end = start_session_index + training_sessions
         scoring_start = training_end
-        scoring_end = scoring_start + config.scoring_bars
+        scoring_end = scoring_start + scoring_sessions
         windows.append(
             WalkForwardWindow(
                 window_id=f"wf-{len(windows) + 1}",
-                training=_window_range(dataset, training_start, training_end),
-                scoring=_window_range(dataset, scoring_start, scoring_end),
+                training=_window_range(dataset, sessions[training_start:training_end]),
+                scoring=_window_range(dataset, sessions[scoring_start:scoring_end]),
             )
         )
-        start_index += step_bars
+        start_session_index += step_sessions
 
     if not windows:
         raise ValueError("dataset does not contain enough bars for the walk-forward configuration")
     return windows
 
 
-def _window_range(dataset: VersionedDataset, start_index: int, end_index: int) -> WindowRange:
+def _normalized_walk_forward_sessions(config: WalkForwardConfig) -> tuple[int, int, int]:
+    has_session_fields = config.training_sessions is not None or config.scoring_sessions is not None
+    has_bar_fields = config.training_bars is not None or config.scoring_bars is not None
+    if has_session_fields and has_bar_fields:
+        raise ValueError("walk_forward cannot mix session-based fields with legacy bar-based fields")
+    if has_session_fields:
+        if config.training_sessions is None or config.scoring_sessions is None:
+            raise ValueError("walk_forward.training_sessions and walk_forward.scoring_sessions must be provided together")
+        training_sessions = config.training_sessions
+        scoring_sessions = config.scoring_sessions
+        step_sessions = config.step_sessions if config.step_sessions is not None else scoring_sessions
+    elif has_bar_fields:
+        if config.training_bars is None or config.scoring_bars is None:
+            raise ValueError("walk_forward.training_bars and walk_forward.scoring_bars must be provided together")
+        training_sessions = config.training_bars
+        scoring_sessions = config.scoring_bars
+        step_sessions = config.step_bars if config.step_bars is not None else scoring_sessions
+    else:
+        raise ValueError("walk_forward requires training_sessions and scoring_sessions")
+
+    if training_sessions <= 0:
+        raise ValueError("walk_forward.training_sessions must be positive")
+    if scoring_sessions <= 0:
+        raise ValueError("walk_forward.scoring_sessions must be positive")
+    if step_sessions is None or step_sessions <= 0:
+        raise ValueError("walk_forward.step_sessions must be positive")
+    return training_sessions, scoring_sessions, step_sessions
+
+
+def _dataset_sessions(dataset: VersionedDataset) -> List[_DatasetSession]:
+    declared_sessions = dataset.manifest["session"].get("sessions")
+    if isinstance(declared_sessions, list) and declared_sessions:
+        sessions: List[_DatasetSession] = []
+        for item in declared_sessions:
+            first_bar = _parse_manifest_timestamp(str(item["firstBarTime"]))
+            last_bar = _parse_manifest_timestamp(str(item["lastBarTime"]))
+            start_index = _bar_index_at_time(dataset, first_bar)
+            end_index = _bar_index_at_time(dataset, last_bar)
+            if start_index is None or end_index is None:
+                raise ValueError(f"declared session {item['id']} does not align to dataset bars")
+            sessions.append(
+                _DatasetSession(
+                    session_id=str(item["id"]),
+                    session_date=_session_date(dataset, first_bar),
+                    start_index=start_index,
+                    end_index=end_index,
+                )
+            )
+        sessions.sort(key=lambda session: session.start_index)
+        return sessions
+
+    timezone = ZoneInfo(str(dataset.manifest["session"]["timezone"]))
+    sessions_by_date: Dict[str, _DatasetSession] = {}
+    for index, bar in enumerate(dataset.bars):
+        session_date = bar.time.astimezone(timezone).date().isoformat()
+        existing = sessions_by_date.get(session_date)
+        if existing is None:
+            sessions_by_date[session_date] = _DatasetSession(
+                session_id=session_date,
+                session_date=session_date,
+                start_index=index,
+                end_index=index,
+            )
+        else:
+            sessions_by_date[session_date] = _DatasetSession(
+                session_id=existing.session_id,
+                session_date=existing.session_date,
+                start_index=existing.start_index,
+                end_index=index,
+            )
+    return sorted(sessions_by_date.values(), key=lambda session: session.start_index)
+
+
+def _bar_index_at_time(dataset: VersionedDataset, value: datetime) -> Optional[int]:
+    target = timestamp_to_nanoseconds(value)
+    for index, bar in enumerate(dataset.bars):
+        if timestamp_to_nanoseconds(bar.time) == target:
+            return index
+    return None
+
+
+def _session_date(dataset: VersionedDataset, value: datetime) -> str:
+    timezone = ZoneInfo(str(dataset.manifest["session"]["timezone"]))
+    return value.astimezone(timezone).date().isoformat()
+
+
+def _parse_manifest_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=ZoneInfo("UTC"))
+    return parsed.astimezone(ZoneInfo("UTC"))
+
+
+def _window_range(dataset: VersionedDataset, sessions: List[_DatasetSession]) -> WindowRange:
+    start_index = sessions[0].start_index
+    end_index = sessions[-1].end_index
     return WindowRange(
         start=dataset.bars[start_index].time.isoformat(),
-        end=dataset.bars[end_index - 1].time.isoformat(),
+        end=dataset.bars[end_index].time.isoformat(),
         start_index=start_index,
-        end_index=end_index - 1,
+        end_index=end_index,
+        start_session_date=sessions[0].session_date,
+        end_session_date=sessions[-1].session_date,
+        session_count=len(sessions),
+        bar_count=end_index - start_index + 1,
     )
 
 
@@ -444,8 +559,16 @@ def _slice_dataset_for_window(dataset: VersionedDataset, scoring: WindowRange) -
         for feature in dataset.features
         if start_time <= feature.availability_time <= end_time
     ]
+    manifest = json.loads(json.dumps(dataset.manifest))
+    declared_sessions = manifest["session"].get("sessions")
+    if isinstance(declared_sessions, list) and declared_sessions:
+        manifest["session"]["sessions"] = [
+            session
+            for session in declared_sessions
+            if scoring.start <= _parse_manifest_timestamp(str(session["firstBarTime"])).isoformat() <= scoring.end
+        ]
     return VersionedDataset(
-        manifest=dataset.manifest,
+        manifest=manifest,
         bars=bars,
         features=features,
         path=dataset.path,
@@ -454,10 +577,16 @@ def _slice_dataset_for_window(dataset: VersionedDataset, scoring: WindowRange) -
 
 def _walk_forward_result(
     window_id: str,
-    result: StrategyBacktestResult,
+    window_range: WindowRange,
+    validation: Any,
 ) -> WalkForwardWindowResult:
+    result = validation.result
     return WalkForwardWindowResult(
         window_id=window_id,
+        start_session_date=window_range.start_session_date,
+        end_session_date=window_range.end_session_date,
+        session_count=window_range.session_count,
+        bar_count=window_range.bar_count,
         orders=result.orders,
         gross_pnl=result.gross_pnl,
         total_costs=result.total_costs,
@@ -465,7 +594,21 @@ def _walk_forward_result(
         order_count=len(result.orders),
         trade_count=len(result.orders) // 2,
         max_drawdown=_max_drawdown(_trade_net_pnls(result.orders)),
+        result_summary=_result_summary(result),
+        nautilus_provenance=validation.nautilus_provenance,
     )
+
+
+def _result_summary(result: StrategyBacktestResult) -> Dict[str, Any]:
+    return {
+        "engine": result.engine,
+        "grossPnl": result.gross_pnl,
+        "totalCosts": result.total_costs,
+        "netPnl": result.net_pnl,
+        "positionQuantity": result.position_quantity,
+        "orderCount": len(result.orders),
+        "tradeCount": len(result.orders) // 2,
+    }
 
 
 def _evaluate_fitness(
@@ -692,8 +835,8 @@ def _write_walk_forward_registry_record(
 
     record = {
         "runId": run_id,
-        "recordType": "Evaluator Walk-Forward Replay Helper",
-        "authoritative": False,
+        "recordType": "Nautilus Walk-Forward Validation",
+        "authoritative": True,
         "dataset": {
             "datasetId": dataset.dataset_id,
             "path": str(dataset.path),
@@ -709,7 +852,7 @@ def _write_walk_forward_registry_record(
         "evaluatorVersion": EVALUATOR_VERSION,
         "searchConfiguration": {
             "type": "fixed-strategy-spec",
-            "description": "No optimizer is run in this slice; training windows are replayed separately from scoring windows.",
+            "description": "No optimizer is run in this slice; training and scoring windows are validated separately through NautilusTrader.",
         },
         "walkForward": {
             "config": _walk_forward_config_to_json(walk_forward),
@@ -772,10 +915,11 @@ def _cost_model_to_json(cost_model: CostModel) -> Dict[str, Any]:
 
 
 def _walk_forward_config_to_json(config: WalkForwardConfig) -> Dict[str, Any]:
+    training_sessions, scoring_sessions, step_sessions = _normalized_walk_forward_sessions(config)
     return {
-        "trainingBars": config.training_bars,
-        "scoringBars": config.scoring_bars,
-        "stepBars": config.step_bars if config.step_bars is not None else config.scoring_bars,
+        "trainingSessions": training_sessions,
+        "scoringSessions": scoring_sessions,
+        "stepSessions": step_sessions,
     }
 
 
@@ -793,18 +937,28 @@ def _window_range_to_json(window_range: WindowRange) -> Dict[str, Any]:
         "end": window_range.end,
         "startIndex": window_range.start_index,
         "endIndex": window_range.end_index,
+        "startSessionDate": window_range.start_session_date,
+        "endSessionDate": window_range.end_session_date,
+        "sessionCount": window_range.session_count,
+        "barCount": window_range.bar_count,
     }
 
 
 def _walk_forward_window_result_to_json(result: WalkForwardWindowResult) -> Dict[str, Any]:
     return {
         "windowId": result.window_id,
+        "startSessionDate": result.start_session_date,
+        "endSessionDate": result.end_session_date,
+        "sessionCount": result.session_count,
+        "barCount": result.bar_count,
         "grossPnl": result.gross_pnl,
         "totalCosts": result.total_costs,
         "netPnl": result.net_pnl,
         "orderCount": result.order_count,
         "tradeCount": result.trade_count,
         "maxDrawdown": result.max_drawdown,
+        "resultSummary": result.result_summary,
+        "nautilusTrader": result.nautilus_provenance,
     }
 
 

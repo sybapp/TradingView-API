@@ -52,6 +52,20 @@ class _OpenPosition:
     entry_price: float
 
 
+@dataclass(frozen=True)
+class NautilusValidationRun:
+    result: StrategyBacktestResult
+    nautilus_provenance: Dict[str, Any]
+    environment: Dict[str, Any]
+    instrument: Dict[str, Any]
+    venue: Dict[str, Any]
+    bar_type: Dict[str, Any]
+    cost_configuration: Dict[str, Any]
+    fills_report: Any
+    positions_report: Any
+    account_report: Any
+
+
 def run_nautilus_validation_backtest(
     *,
     dataset_path: Union[str, Path],
@@ -61,6 +75,37 @@ def run_nautilus_validation_backtest(
 ) -> StrategyBacktestResult:
     dataset = load_versioned_dataset(dataset_path)
     spec = validate_strategy_spec(strategy_spec)
+    validation = run_nautilus_validation_dataset(
+        dataset=dataset,
+        spec=spec,
+        cost_model=cost_model,
+    )
+    record_path = _write_nautilus_validation_record(
+        registry_path=Path(registry_path),
+        dataset=dataset,
+        spec=spec,
+        cost_model=cost_model,
+        validation=validation,
+    )
+    return StrategyBacktestResult(
+        dataset_id=validation.result.dataset_id,
+        strategy_id=validation.result.strategy_id,
+        engine=validation.result.engine,
+        orders=validation.result.orders,
+        position_quantity=validation.result.position_quantity,
+        gross_pnl=validation.result.gross_pnl,
+        total_costs=validation.result.total_costs,
+        net_pnl=validation.result.net_pnl,
+        registry_record_path=record_path,
+    )
+
+
+def run_nautilus_validation_dataset(
+    *,
+    dataset: VersionedDataset,
+    spec: StrategySpec,
+    cost_model: CostModel,
+) -> NautilusValidationRun:
     _validate_cost_model(cost_model)
 
     nautilus = _load_nautilus_runtime()
@@ -116,30 +161,17 @@ def run_nautilus_validation_backtest(
         positions_report = engine.trader.generate_positions_report()
         account_report = engine.trader.generate_account_report(venue)
         result = _result_from_orders(dataset, spec, orders)
-        record_path = _write_nautilus_validation_record(
-            registry_path=Path(registry_path),
-            dataset=dataset,
-            spec=spec,
-            cost_model=cost_model,
+        return NautilusValidationRun(
             result=result,
-            instrument=instrument,
-            venue=venue,
-            bar_type_string=bar_type_string,
-            nautilus=nautilus,
+            nautilus_provenance=_nautilus_provenance(nautilus),
+            environment=_environment_details(),
+            instrument=_instrument_details(instrument),
+            venue=_venue_details(venue),
+            bar_type=_bar_type_details(dataset, bar_type_string),
+            cost_configuration=_cost_configuration(cost_model),
             fills_report=fills_report,
             positions_report=positions_report,
             account_report=account_report,
-        )
-        return StrategyBacktestResult(
-            dataset_id=result.dataset_id,
-            strategy_id=result.strategy_id,
-            engine=result.engine,
-            orders=result.orders,
-            position_quantity=result.position_quantity,
-            gross_pnl=result.gross_pnl,
-            total_costs=result.total_costs,
-            net_pnl=result.net_pnl,
-            registry_record_path=record_path,
         )
     finally:
         engine.dispose()
@@ -524,30 +556,24 @@ def _write_nautilus_validation_record(
     dataset: VersionedDataset,
     spec: StrategySpec,
     cost_model: CostModel,
-    result: StrategyBacktestResult,
-    instrument: Any,
-    venue: Any,
-    bar_type_string: str,
-    nautilus: Mapping[str, Any],
-    fills_report: Any,
-    positions_report: Any,
-    account_report: Any,
+    validation: NautilusValidationRun,
 ) -> Path:
-    run_id = _nautilus_run_id(dataset, spec, cost_model, bar_type_string)
+    result = validation.result
+    run_id = _nautilus_run_id(dataset, spec, cost_model, validation.bar_type["value"])
     run_path = registry_path / run_id
     run_path.mkdir(parents=True, exist_ok=True)
 
     _write_json(run_path / "orders.json", [_order_to_json(order) for order in result.orders])
-    fills_report.to_csv(run_path / "nautilus-order-fills.csv")
-    positions_report.to_csv(run_path / "nautilus-positions.csv")
-    account_report.to_csv(run_path / "nautilus-account.csv")
+    validation.fills_report.to_csv(run_path / "nautilus-order-fills.csv")
+    validation.positions_report.to_csv(run_path / "nautilus-positions.csv")
+    validation.account_report.to_csv(run_path / "nautilus-account.csv")
 
     record = {
         "runId": run_id,
         "recordType": "Nautilus Validation",
         "evaluatorVersion": NAUTILUS_VALIDATION_VERSION,
-        "nautilusTrader": _nautilus_provenance(nautilus),
-        "environment": _environment_details(),
+        "nautilusTrader": validation.nautilus_provenance,
+        "environment": validation.environment,
         "dataset": {
             "datasetId": dataset.dataset_id,
             "path": str(dataset.path),
@@ -564,29 +590,10 @@ def _write_nautilus_validation_record(
             "strategyId": spec.strategy_id,
             "identityHash": _json_hash(spec.raw),
         },
-        "instrument": {
-            "instrumentId": instrument.id.value,
-            "rawSymbol": str(instrument.raw_symbol),
-            "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
-            "expiryYear": 2026,
-            "expiryMonth": 9,
-            "priceIncrement": str(instrument.price_increment),
-            "pricePrecision": int(instrument.price_precision),
-        },
-        "venue": {
-            "name": venue.value,
-            "omsType": "NETTING",
-            "accountType": "MARGIN",
-            "baseCurrency": "USD",
-            "startingBalances": ["1000000 USD"],
-        },
-        "barType": {
-            "value": bar_type_string,
-            "aggregation": dataset.interval,
-            "priceType": "LAST",
-            "source": "EXTERNAL",
-        },
-        "costConfiguration": _cost_configuration(cost_model),
+        "instrument": validation.instrument,
+        "venue": validation.venue,
+        "barType": validation.bar_type,
+        "costConfiguration": validation.cost_configuration,
         "results": {
             "grossPnl": result.gross_pnl,
             "totalCosts": result.total_costs,
@@ -624,6 +631,37 @@ def _environment_details() -> Dict[str, Any]:
         "platform": platform.platform(),
         "cwd": os.getcwd(),
         "argv": sys.argv,
+    }
+
+
+def _instrument_details(instrument: Any) -> Dict[str, Any]:
+    return {
+        "instrumentId": instrument.id.value,
+        "rawSymbol": str(instrument.raw_symbol),
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "expiryYear": 2026,
+        "expiryMonth": 9,
+        "priceIncrement": str(instrument.price_increment),
+        "pricePrecision": int(instrument.price_precision),
+    }
+
+
+def _venue_details(venue: Any) -> Dict[str, Any]:
+    return {
+        "name": venue.value,
+        "omsType": "NETTING",
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "startingBalances": ["1000000 USD"],
+    }
+
+
+def _bar_type_details(dataset: VersionedDataset, bar_type_string: str) -> Dict[str, Any]:
+    return {
+        "value": bar_type_string,
+        "aggregation": dataset.interval,
+        "priceType": "LAST",
+        "source": "EXTERNAL",
     }
 
 

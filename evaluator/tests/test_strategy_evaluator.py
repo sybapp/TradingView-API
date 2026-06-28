@@ -79,38 +79,48 @@ class StrategyEvaluatorTests(unittest.TestCase):
                 strategy_spec=HAND_WRITTEN_SPEC,
                 cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
                 registry_path=Path(temp_dir) / "run-registry",
-                walk_forward=WalkForwardConfig(training_bars=2, scoring_bars=4),
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1),
                 fitness_constraints=FitnessConstraints(min_trades=0),
             )
 
             self.assertEqual(len(result.windows), 1)
             self.assertEqual(result.windows[0].training.start, "2026-06-25T13:30:00+00:00")
-            self.assertEqual(result.windows[0].training.end, "2026-06-25T13:35:00+00:00")
-            self.assertEqual(result.windows[0].scoring.start, "2026-06-25T13:40:00+00:00")
-            self.assertEqual(result.windows[0].scoring.end, "2026-06-25T13:55:00+00:00")
+            self.assertEqual(result.windows[0].training.end, "2026-06-25T13:40:00+00:00")
+            self.assertEqual(result.windows[0].training.start_session_date, "2026-06-25")
+            self.assertEqual(result.windows[0].training.end_session_date, "2026-06-25")
+            self.assertEqual(result.windows[0].scoring.start, "2026-06-26T13:30:00+00:00")
+            self.assertEqual(result.windows[0].scoring.end, "2026-06-26T13:40:00+00:00")
+            self.assertEqual(result.windows[0].scoring.start_session_date, "2026-06-26")
+            self.assertEqual(result.windows[0].scoring.end_session_date, "2026-06-26")
             self.assertEqual(result.window_results[0].order_count, 0)
             self.assertEqual(result.window_results[0].net_pnl, 0)
 
     def test_walk_forward_config_can_create_multiple_scoring_windows(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            dataset_path = _write_walk_forward_dataset(Path(temp_dir) / "dataset", features=[])
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[],
+                prices=[100, 100, 100, 100, 100, 100, 100, 100, 100],
+                session_dates=["2026-06-25", "2026-06-26", "2026-06-29"],
+            )
 
             result = run_walk_forward_backtest(
                 dataset_path=dataset_path,
                 strategy_spec=HAND_WRITTEN_SPEC,
                 cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
                 registry_path=Path(temp_dir) / "run-registry",
-                walk_forward=WalkForwardConfig(training_bars=2, scoring_bars=2, step_bars=2),
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1, step_sessions=1),
                 fitness_constraints=FitnessConstraints(min_trades=0, min_profitable_windows=0),
             )
 
             self.assertEqual([window.window_id for window in result.windows], ["wf-1", "wf-2"])
-            self.assertEqual(result.windows[0].training.end_index, 1)
-            self.assertEqual(result.windows[0].scoring.start_index, 2)
-            self.assertEqual(result.windows[0].scoring.end_index, 3)
-            self.assertEqual(result.windows[1].training.start_index, 2)
-            self.assertEqual(result.windows[1].scoring.start_index, 4)
-            self.assertEqual(result.windows[1].scoring.end_index, 5)
+            self.assertEqual(result.windows[0].training.end_index, 2)
+            self.assertEqual(result.windows[0].scoring.start_index, 3)
+            self.assertEqual(result.windows[0].scoring.end_index, 5)
+            self.assertEqual(result.windows[1].training.start_index, 3)
+            self.assertEqual(result.windows[1].scoring.start_index, 6)
+            self.assertEqual(result.windows[1].scoring.end_index, 8)
+            self.assertEqual(result.windows[0].training.bar_count, 3)
             self.assertEqual([window_result.order_count for window_result in result.window_results], [0, 0])
 
     def test_walk_forward_fitness_rejects_high_sharpe_candidate_that_fails_survival(self):
@@ -120,9 +130,10 @@ class StrategyEvaluatorTests(unittest.TestCase):
                 Path(temp_dir) / "dataset",
                 prices=[100, 100, 100, 100, 100, 110, 100, 100, 100, 100, 100, 112],
                 features=[
-                    _direction_feature("feature-score-1", "2026-06-25T13:45:00.000Z"),
-                    _direction_feature("feature-score-2", "2026-06-25T14:15:00.000Z"),
+                    _direction_feature("feature-score-1", "2026-06-26T13:30:00.000Z"),
+                    _direction_feature("feature-score-2", "2026-06-28T13:30:00.000Z"),
                 ],
+                session_dates=["2026-06-25", "2026-06-26", "2026-06-27", "2026-06-28"],
             )
 
             result = run_walk_forward_backtest(
@@ -130,7 +141,7 @@ class StrategyEvaluatorTests(unittest.TestCase):
                 strategy_spec=HAND_WRITTEN_SPEC,
                 cost_model=CostModel(fixed_fee=2.50, slippage_ticks=1, tick_size=0.25),
                 registry_path=registry_path,
-                walk_forward=WalkForwardConfig(training_bars=2, scoring_bars=4, step_bars=6),
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1, step_sessions=2),
                 fitness_constraints=FitnessConstraints(min_trades=3, max_drawdown=2000),
             )
 
@@ -141,20 +152,27 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertIsNone(result.fitness.score)
 
             registry_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
-            self.assertEqual(registry_record["recordType"], "Evaluator Walk-Forward Replay Helper")
-            self.assertFalse(registry_record["authoritative"])
-            self.assertEqual(registry_record["walkForward"]["config"]["trainingBars"], 2)
-            self.assertEqual(registry_record["walkForward"]["windows"][0]["scoring"]["start"], "2026-06-25T13:40:00+00:00")
+            self.assertEqual(registry_record["recordType"], "Nautilus Walk-Forward Validation")
+            self.assertTrue(registry_record["authoritative"])
+            self.assertEqual(registry_record["walkForward"]["config"]["trainingSessions"], 1)
+            self.assertEqual(registry_record["walkForward"]["windows"][0]["scoring"]["startSessionDate"], "2026-06-26")
+            self.assertEqual(registry_record["walkForward"]["windows"][0]["scoring"]["barCount"], 3)
             self.assertEqual(registry_record["trainingWindowResults"][0]["tradeCount"], 0)
             self.assertEqual(registry_record["perWindowResults"][0]["tradeCount"], 1)
+            self.assertEqual(registry_record["perWindowResults"][0]["resultSummary"]["engine"], "nautilus-trader-backtest-engine")
+            self.assertEqual(registry_record["perWindowResults"][0]["nautilusTrader"]["engine"], "BacktestEngine")
             self.assertEqual(registry_record["fitness"]["survivalChecks"]["minTrades"]["passed"], False)
             self.assertEqual(registry_record["fitness"]["rejectionReasons"], ["min_trades"])
             self.assertGreater(registry_record["fitness"]["rankingInputs"]["outOfSampleSharpe"], 0)
 
 
-def _write_walk_forward_dataset(path: Path, features, prices=None):
+def _write_walk_forward_dataset(path: Path, features, prices=None, session_dates=None):
     path.mkdir()
     prices = prices or [100, 100, 100, 100, 100, 110]
+    session_dates = session_dates or ["2026-06-25", "2026-06-26"]
+    if len(prices) % len(session_dates) != 0:
+        raise ValueError("test fixture prices must divide evenly across sessions")
+    bars_per_session = len(prices) // len(session_dates)
     manifest = {
         "schemaVersion": 1,
         "datasetId": "walk-forward-fixture",
@@ -162,17 +180,37 @@ def _write_walk_forward_dataset(path: Path, features, prices=None):
         "source": {"kind": "tradingview"},
         "symbol": {"ticker": "CME_MINI:ES1!"},
         "bar": {"interval": "5m", "priceScale": 100},
-        "session": {"timezone": "UTC", "start": "13:30", "end": "23:59"},
+        "session": {
+            "timezone": "UTC",
+            "start": "13:30",
+            "end": "13:45",
+            "sessions": [
+                {
+                    "id": session_date,
+                    "firstBarTime": _session_bar_time(session_date, 0).isoformat().replace("+00:00", ".000Z"),
+                    "lastBarTime": _session_bar_time(session_date, bars_per_session - 1).isoformat().replace("+00:00", ".000Z"),
+                    "barCount": bars_per_session,
+                }
+                for session_date in session_dates
+            ],
+        },
     }
-    start_time = datetime(2026, 6, 25, 13, 30, tzinfo=timezone.utc)
     bars = [
-        _bar((start_time + timedelta(minutes=5 * index)).isoformat().replace("+00:00", ".000Z"), price)
-        for index, price in enumerate(prices)
+        _bar(_session_bar_time(session_date, bar_index).isoformat().replace("+00:00", ".000Z"), price)
+        for session_index, session_date in enumerate(session_dates)
+        for bar_index, price in enumerate(
+            prices[session_index * bars_per_session : (session_index + 1) * bars_per_session]
+        )
     ]
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "bars.json").write_text(json.dumps(bars), encoding="utf-8")
     (path / "features.json").write_text(json.dumps(features), encoding="utf-8")
     return path
+
+
+def _session_bar_time(session_date: str, index: int) -> datetime:
+    date = datetime.fromisoformat(session_date)
+    return datetime(date.year, date.month, date.day, 13, 30, tzinfo=timezone.utc) + timedelta(minutes=5 * index)
 
 
 def _bar(timestamp: str, open_price: float):

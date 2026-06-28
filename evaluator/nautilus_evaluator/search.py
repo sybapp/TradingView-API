@@ -319,9 +319,9 @@ def reproduce_search_winner(registry_record_path: Union[str, Path]) -> WalkForwa
         ),
         registry_path=record_path.parent / "reproduced-runs",
         walk_forward=WalkForwardConfig(
-            training_bars=walk_forward["trainingBars"],
-            scoring_bars=walk_forward["scoringBars"],
-            step_bars=walk_forward["stepBars"],
+            training_sessions=walk_forward.get("trainingSessions", walk_forward.get("trainingBars")),
+            scoring_sessions=walk_forward.get("scoringSessions", walk_forward.get("scoringBars")),
+            step_sessions=walk_forward.get("stepSessions", walk_forward.get("stepBars")),
         ),
         fitness_constraints=FitnessConstraints(
             min_trades=constraints["minTrades"],
@@ -549,10 +549,17 @@ def _cost_model_to_json(cost_model: CostModel) -> JsonObject:
 
 
 def _walk_forward_config_to_json(config: WalkForwardConfig) -> JsonObject:
+    training_sessions = config.training_sessions if config.training_sessions is not None else config.training_bars
+    scoring_sessions = config.scoring_sessions if config.scoring_sessions is not None else config.scoring_bars
+    step_sessions = (
+        config.step_sessions
+        if config.step_sessions is not None
+        else config.step_bars if config.step_bars is not None else scoring_sessions
+    )
     return {
-        "trainingBars": config.training_bars,
-        "scoringBars": config.scoring_bars,
-        "stepBars": config.step_bars if config.step_bars is not None else config.scoring_bars,
+        "trainingSessions": training_sessions,
+        "scoringSessions": scoring_sessions,
+        "stepSessions": step_sessions,
     }
 
 
