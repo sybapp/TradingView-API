@@ -16,6 +16,7 @@ It exposes:
 - `load_versioned_dataset(dataset_path)`
 - `to_nautilus_bar_inputs(dataset)`
 - `to_nautilus_bars(dataset)` when `nautilus_trader` is installed
+- `run_nautilus_validation_backtest(dataset_path, strategy_spec, cost_model, registry_path)`
 - `run_smoke_backtest(dataset_path)`
 - `validate_strategy_spec(strategy_spec)`
 - `run_strategy_backtest(dataset_path, strategy_spec, cost_model, registry_path)`
@@ -23,15 +24,15 @@ It exposes:
 - `run_bounded_strategy_search(dataset_path, templates, cost_model, registry_path, walk_forward, fitness_constraints, search_config, proposed_candidates=None)`
 - `reproduce_search_winner(search_registry_record_path)`
 
-The smoke path can be run against the fixture dataset without calling
-TradingView:
+The non-authoritative smoke replay can be run against the fixture dataset
+without calling TradingView:
 
 ```sh
 uv run python -m evaluator tests/fixtures/es-rth-5m-dataset
 ```
 
-The first hand-written Strategy Spec fixture can be replayed through the
-Nautilus-compatible evaluator and recorded in a local run registry:
+The first hand-written Strategy Spec fixture runs inside the real
+NautilusTrader backtest engine and records a Nautilus Validation run:
 
 ```sh
 uv run python -m evaluator tests/fixtures/es-rth-5m-dataset \
@@ -39,11 +40,13 @@ uv run python -m evaluator tests/fixtures/es-rth-5m-dataset \
   --run-registry runs
 ```
 
-This strategy replay validates the spec, maps it onto the evaluator's
-Nautilus-compatible bar replay strategy, evaluates entry signals after bar
-close, executes orders on the next bar, applies fixed fees and slippage, forces
-the strategy flat before RTH close, and writes a reproducible `run.json` plus
-`orders.json` artifact.
+This validation path loads the fixture Versioned Dataset, converts bars into
+NautilusTrader `Bar` objects for the ESU6.GLBX fixture instrument, executes the
+Strategy Spec through a Nautilus `Strategy` adapter, maps fixed per-contract
+fees and supported slippage settings into Nautilus execution configuration,
+forces the strategy flat before RTH close, and writes a `run.json` marked
+`Nautilus Validation` plus Nautilus report artifacts. Unsupported fee or
+slippage mappings fail before the engine is started.
 
 The evaluator is a root-level `uv` project. Use `uv run ...` commands from the
 repository root so imports resolve from the locked Python 3.12 environment;

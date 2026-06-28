@@ -434,6 +434,8 @@ def _write_search_registry_record(
     winning_run_artifact = _copy_winning_run_artifacts(search_path, winning_candidate)
     record = {
         "runId": run_id,
+        "recordType": "Evaluator Replay Search Helper",
+        "authoritative": False,
         "evaluatorVersion": EVALUATOR_VERSION,
         "dataset": dataset_record,
         "optimizerConfig": _search_config_to_json(search_config),

@@ -10,6 +10,7 @@ from .nautilus_evaluator import (
     CostModel,
     FitnessConstraints,
     WalkForwardConfig,
+    run_nautilus_validation_backtest,
     run_smoke_backtest,
     run_strategy_backtest,
     run_walk_forward_backtest,
@@ -77,7 +78,7 @@ def main() -> None:
             }))
             return
 
-        result = run_strategy_backtest(
+        result = run_nautilus_validation_backtest(
             dataset_path=args.dataset_path,
             strategy_spec=strategy_spec,
             cost_model=cost_model,

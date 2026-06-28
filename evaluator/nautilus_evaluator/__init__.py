@@ -6,7 +6,13 @@ from .dataset import (
     VersionedDataset,
     load_versioned_dataset,
 )
-from .nautilus import NautilusBarInput, to_nautilus_bar_inputs, to_nautilus_bars
+from .nautilus import (
+    NautilusBarInput,
+    concrete_bar_type_string,
+    to_nautilus_bar_inputs,
+    to_nautilus_bars,
+    to_nautilus_bars_for_instrument,
+)
 from .smoke import SmokeBacktestResult, run_smoke_backtest
 from .search import (
     BoundedSearchConfig,
@@ -32,6 +38,7 @@ from .strategy import (
     run_walk_forward_backtest,
 )
 from .strategy_spec import StrategySpec, validate_strategy_spec
+from .validation import NAUTILUS_VALIDATION_VERSION, run_nautilus_validation_backtest
 
 __all__ = [
     "BoundedSearchConfig",
@@ -42,6 +49,7 @@ __all__ = [
     "FitnessConstraints",
     "FitnessResult",
     "NautilusBarInput",
+    "NAUTILUS_VALIDATION_VERSION",
     "SmokeBacktestResult",
     "StrategyBacktestResult",
     "StrategyOrder",
@@ -54,14 +62,17 @@ __all__ = [
     "WalkForwardWindow",
     "WalkForwardWindowResult",
     "WindowRange",
+    "concrete_bar_type_string",
     "generate_bounded_template_specs",
     "load_versioned_dataset",
     "reproduce_search_winner",
     "run_bounded_strategy_search",
+    "run_nautilus_validation_backtest",
     "run_smoke_backtest",
     "run_strategy_backtest",
     "run_walk_forward_backtest",
     "to_nautilus_bar_inputs",
     "to_nautilus_bars",
+    "to_nautilus_bars_for_instrument",
     "validate_strategy_spec",
 ]

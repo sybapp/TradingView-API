@@ -44,6 +44,8 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertEqual(result.net_pnl, 475)
 
             registry_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
+            self.assertEqual(registry_record["recordType"], "Evaluator Replay Helper")
+            self.assertFalse(registry_record["authoritative"])
             self.assertEqual(registry_record["dataset"]["datasetId"], "es-rth-5m-fixture")
             self.assertEqual(registry_record["dataset"]["collectedAt"], "2026-06-28T12:00:00.000Z")
             self.assertEqual(registry_record["strategySpec"], HAND_WRITTEN_SPEC)
@@ -139,6 +141,8 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertIsNone(result.fitness.score)
 
             registry_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
+            self.assertEqual(registry_record["recordType"], "Evaluator Walk-Forward Replay Helper")
+            self.assertFalse(registry_record["authoritative"])
             self.assertEqual(registry_record["walkForward"]["config"]["trainingBars"], 2)
             self.assertEqual(registry_record["walkForward"]["windows"][0]["scoring"]["start"], "2026-06-25T13:40:00+00:00")
             self.assertEqual(registry_record["trainingWindowResults"][0]["tradeCount"], 0)

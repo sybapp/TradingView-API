@@ -117,6 +117,8 @@ class StrategySearchTests(unittest.TestCase):
             self.assertGreater(result.winning_candidate.fitness.score, 0)
 
             search_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
+            self.assertEqual(search_record["recordType"], "Evaluator Replay Search Helper")
+            self.assertFalse(search_record["authoritative"])
             self.assertEqual(search_record["evaluatorVersion"], "strategy-replay-v1")
             self.assertEqual(search_record["dataset"]["datasetId"], "search-fixture")
             self.assertEqual(search_record["dataset"]["artifacts"]["snapshot"], "dataset")

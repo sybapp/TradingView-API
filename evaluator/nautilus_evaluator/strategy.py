@@ -621,6 +621,8 @@ def _write_run_registry_record(
 
     record = {
         "runId": run_id,
+        "recordType": "Evaluator Replay Helper",
+        "authoritative": False,
         "dataset": {
             "datasetId": dataset.dataset_id,
             "path": str(dataset.path),
@@ -690,6 +692,8 @@ def _write_walk_forward_registry_record(
 
     record = {
         "runId": run_id,
+        "recordType": "Evaluator Walk-Forward Replay Helper",
+        "authoritative": False,
         "dataset": {
             "datasetId": dataset.dataset_id,
             "path": str(dataset.path),

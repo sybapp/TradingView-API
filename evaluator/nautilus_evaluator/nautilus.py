@@ -65,6 +65,39 @@ def to_nautilus_bars(dataset: VersionedDataset) -> List[Any]:
     ]
 
 
+def to_nautilus_bars_for_instrument(
+    dataset: VersionedDataset,
+    *,
+    instrument: Any,
+    bar_type: Any,
+) -> List[Any]:
+    """Construct real NautilusTrader Bar objects for a concrete engine instrument."""
+    try:
+        import pandas as pd
+        from nautilus_trader.persistence.wranglers import BarDataWrangler
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("nautilus_trader is required to construct Nautilus Bar objects") from exc
+
+    frame = pd.DataFrame(
+        [
+            {
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+            }
+            for bar in dataset.bars
+        ],
+        index=pd.DatetimeIndex([bar.time for bar in dataset.bars]),
+    )
+    return BarDataWrangler(bar_type, instrument).process(frame)
+
+
+def concrete_bar_type_string(dataset: VersionedDataset, instrument_id: str) -> str:
+    return f"{instrument_id}-{_nautilus_bar_step(dataset.interval)}-LAST-EXTERNAL"
+
+
 def to_nautilus_bar_input(
     *,
     bar: DatasetBar,
