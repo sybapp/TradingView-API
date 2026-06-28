@@ -94,7 +94,7 @@ class StrategySearchTests(unittest.TestCase):
                 template_id="direction-template",
                 base_spec=BASE_SPEC,
                 choices={
-                    "entryRules.0.value": [-1, 1],
+                    "entryRules.0.value": [1, -1],
                     "sizing.quantity": [1, 2],
                 },
             )
@@ -111,31 +111,82 @@ class StrategySearchTests(unittest.TestCase):
 
             self.assertEqual(result.optimizer_config["method"], "optuna_style")
             self.assertEqual(len(result.evaluated_candidates), 4)
+            self.assertEqual(len(result.surviving_candidates), 2)
+            self.assertIsNotNone(result.winning_candidate)
             self.assertEqual(result.winning_candidate.strategy_spec["entryRules"][0]["value"], 1)
             self.assertEqual(result.winning_candidate.strategy_spec["sizing"]["quantity"], 2)
             self.assertTrue(result.winning_candidate.fitness.survived)
             self.assertGreater(result.winning_candidate.fitness.score, 0)
 
             search_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
-            self.assertEqual(search_record["recordType"], "Evaluator Replay Search Helper")
-            self.assertFalse(search_record["authoritative"])
+            self.assertEqual(search_record["recordType"], "Nautilus Validation Search")
+            self.assertTrue(search_record["authoritative"])
+            self.assertEqual(search_record["status"], "completed")
             self.assertEqual(search_record["evaluatorVersion"], "strategy-replay-v1")
             self.assertEqual(search_record["dataset"]["datasetId"], "search-fixture")
             self.assertEqual(search_record["dataset"]["artifacts"]["snapshot"], "dataset")
             self.assertEqual(search_record["optimizerConfig"]["method"], "optuna_style")
             self.assertEqual(len(search_record["generatedCandidates"]), 4)
             self.assertEqual(len(search_record["evaluatedSpecs"]), 4)
+            self.assertEqual(len(search_record["survivingCandidates"]), 2)
+            self.assertEqual(len(search_record["rejectedCandidates"]), 2)
             self.assertEqual(
                 [candidate["optimizerPhase"] for candidate in search_record["evaluatedSpecs"]],
                 ["exploration", "exploration", "exploitation", "exploitation"],
             )
+            self.assertEqual(search_record["ranking"][0], result.winning_candidate.strategy_id)
             self.assertEqual(search_record["winningRun"]["strategySpec"], result.winning_candidate.strategy_spec)
+            self.assertEqual(search_record["winningRun"]["provenance"]["recordType"], "Nautilus Walk-Forward Validation")
+            self.assertTrue(search_record["winningRun"]["provenance"]["requiredNautilusProvenance"])
+            self.assertIsNotNone(search_record["bestRejectedCandidate"])
+            self.assertTrue(search_record["bestRejectedCandidate"]["diagnosticOnly"])
+            self.assertIn("reproducibilityInputs", search_record)
             self.assertTrue((result.registry_record_path.parent / search_record["winningRun"]["artifacts"]["runRecord"]).exists())
 
             shutil.rmtree(dataset_path)
             reproduced = reproduce_search_winner(result.registry_record_path)
             self.assertEqual(reproduced.strategy_id, result.winning_candidate.strategy_id)
             self.assertEqual(reproduced.fitness.score, result.winning_candidate.fitness.score)
+
+    def test_bounded_search_records_no_survivors_without_winner(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_search_dataset(Path(temp_dir) / "dataset")
+            registry_path = Path(temp_dir) / "run-registry"
+            template = StrategyTemplate(
+                template_id="direction-template",
+                base_spec=BASE_SPEC,
+                choices={
+                    "entryRules.0.value": [1, -1],
+                    "sizing.quantity": [1, 2],
+                },
+            )
+
+            result = run_bounded_strategy_search(
+                dataset_path=dataset_path,
+                templates=[template],
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=registry_path,
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1, step_sessions=2),
+                fitness_constraints=FitnessConstraints(min_trades=99, min_profitable_windows=1),
+                search_config=BoundedSearchConfig(method="deterministic", max_candidates=4, seed=11),
+            )
+
+            self.assertEqual(len(result.evaluated_candidates), 4)
+            self.assertEqual(result.surviving_candidates, [])
+            self.assertIsNone(result.winning_candidate)
+            self.assertEqual(len(result.rejected_candidates), 4)
+
+            search_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
+            self.assertEqual(search_record["status"], "completed_no_survivors")
+            self.assertEqual(search_record["ranking"], [])
+            self.assertEqual(search_record["survivingCandidates"], [])
+            self.assertIsNone(search_record["winningRun"])
+            self.assertIsNotNone(search_record["bestRejectedCandidate"])
+            self.assertTrue(search_record["bestRejectedCandidate"]["diagnosticOnly"])
+            self.assertIn("min_trades", search_record["rejectedCandidates"][0]["rejectionReasons"])
+
+            with self.assertRaisesRegex(ValueError, "no surviving Nautilus Validation winner"):
+                reproduce_search_winner(result.registry_record_path)
 
     def test_llm_proposed_candidates_are_validated_before_evaluation(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -157,6 +208,7 @@ class StrategySearchTests(unittest.TestCase):
             self.assertEqual(len(result.rejected_candidates), 1)
             self.assertIn("schemaVersion must be 1", result.rejected_candidates[0]["error"])
             self.assertEqual([candidate.strategy_id for candidate in result.evaluated_candidates], ["valid-llm-proposal"])
+            self.assertEqual([candidate.strategy_id for candidate in result.surviving_candidates], ["valid-llm-proposal"])
 
 
 def _write_search_dataset(path: Path):

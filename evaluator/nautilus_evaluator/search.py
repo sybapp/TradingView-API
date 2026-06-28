@@ -58,8 +58,9 @@ class StrategySearchResult:
     optimizer_config: JsonObject
     generated_candidates: List[JsonObject]
     evaluated_candidates: List[EvaluatedSearchCandidate]
+    surviving_candidates: List[EvaluatedSearchCandidate]
     rejected_candidates: List[JsonObject]
-    winning_candidate: EvaluatedSearchCandidate
+    winning_candidate: Optional[EvaluatedSearchCandidate]
     registry_record_path: Path
 
 
@@ -127,7 +128,9 @@ def run_bounded_strategy_search(
     if not evaluated:
         raise ValueError("bounded strategy search did not produce any schema-valid candidates")
 
-    winning_candidate = _rank_candidates(evaluated)[0]
+    surviving_candidates, evaluated_rejections = _surviving_candidates(evaluated)
+    rejected = _dedupe_rejected_candidates([*rejected, *evaluated_rejections])
+    winning_candidate = _rank_survivors(surviving_candidates)[0] if surviving_candidates else None
     record_path = _write_search_registry_record(
         dataset_path=Path(dataset_path),
         registry_path=Path(registry_path),
@@ -137,6 +140,7 @@ def run_bounded_strategy_search(
         fitness_constraints=fitness_constraints,
         generated_candidates=generated_candidates,
         evaluated_candidates=evaluated,
+        surviving_candidates=surviving_candidates,
         rejected_candidates=rejected,
         winning_candidate=winning_candidate,
     )
@@ -144,6 +148,7 @@ def run_bounded_strategy_search(
         optimizer_config=_search_config_to_json(search_config),
         generated_candidates=generated_candidates,
         evaluated_candidates=evaluated,
+        surviving_candidates=surviving_candidates,
         rejected_candidates=rejected,
         winning_candidate=winning_candidate,
         registry_record_path=record_path,
@@ -224,8 +229,10 @@ def _run_optuna_style_search(
 
     generated_candidates = list(exploratory_candidates)
     remaining_budget = search_config.max_candidates - len(generated_candidates)
-    if remaining_budget > 0 and evaluated:
-        best_spec = _rank_candidates(evaluated)[0].strategy_spec
+    surviving_candidates, _ = _surviving_candidates(evaluated)
+
+    if remaining_budget > 0 and surviving_candidates:
+        best_spec = _rank_survivors(surviving_candidates)[0].strategy_spec
         exploitation_candidates = _rank_unevaluated_candidates_for_exploitation(
             candidates=template_candidates[exploration_count:],
             best_spec=best_spec,
@@ -260,6 +267,7 @@ def _run_optuna_style_search(
         evaluated.extend(proposed_evaluated)
         rejected.extend(proposed_rejected)
 
+    rejected = _dedupe_rejected_candidates(rejected)
     return generated_candidates, evaluated, rejected
 
 
@@ -305,6 +313,8 @@ def reproduce_search_winner(registry_record_path: Union[str, Path]) -> WalkForwa
     """Re-run the winning Strategy Spec using only the search registry artifact."""
     record_path = Path(registry_record_path)
     record = json.loads(record_path.read_text(encoding="utf-8"))
+    if record.get("status") == "completed_no_survivors" or record.get("winningRun") is None:
+        raise ValueError("search completed with no surviving Nautilus Validation winner to reproduce")
     cost_model = record["costModel"]
     walk_forward = record["walkForward"]["config"]
     constraints = record["fitnessConstraints"]
@@ -393,17 +403,92 @@ def _set_path(value: JsonObject, path: str, replacement: Any) -> None:
         target[final] = replacement
 
 
-def _rank_candidates(candidates: List[EvaluatedSearchCandidate]) -> List[EvaluatedSearchCandidate]:
+def _rank_survivors(candidates: List[EvaluatedSearchCandidate]) -> List[EvaluatedSearchCandidate]:
     return sorted(candidates, key=_candidate_rank_key, reverse=True)
 
 
 def _candidate_rank_key(candidate: EvaluatedSearchCandidate):
     fitness = candidate.fitness
     return (
-        1 if fitness.survived else 0,
         fitness.score if fitness.score is not None else float("-inf"),
         fitness.ranking_inputs.get("netPnl", 0),
         fitness.ranking_inputs.get("tradeCount", 0),
+    )
+
+
+def _diagnostic_rank_key(candidate: EvaluatedSearchCandidate):
+    fitness = candidate.fitness
+    return (
+        fitness.ranking_inputs.get("outOfSampleSharpe", float("-inf")),
+        fitness.ranking_inputs.get("netPnl", 0),
+        fitness.ranking_inputs.get("tradeCount", 0),
+    )
+
+
+def _surviving_candidates(
+    candidates: List[EvaluatedSearchCandidate],
+) -> tuple[List[EvaluatedSearchCandidate], List[JsonObject]]:
+    survivors: List[EvaluatedSearchCandidate] = []
+    rejected: List[JsonObject] = []
+    for candidate in candidates:
+        validation_reasons = _nautilus_validation_rejection_reasons(candidate)
+        if validation_reasons:
+            rejected.append(_rejected_evaluated_candidate_to_json(candidate, validation_reasons))
+            continue
+        if not candidate.fitness.survived:
+            rejected.append(_rejected_evaluated_candidate_to_json(candidate, candidate.fitness.rejection_reasons))
+            continue
+        survivors.append(candidate)
+    return survivors, rejected
+
+
+def _nautilus_validation_rejection_reasons(candidate: EvaluatedSearchCandidate) -> List[str]:
+    record_path = candidate.result.registry_record_path
+    if not record_path.exists():
+        return ["missing_run_registry_record"]
+    try:
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ["invalid_run_registry_record"]
+
+    reasons: List[str] = []
+    if record.get("recordType") != "Nautilus Walk-Forward Validation":
+        reasons.append("not_nautilus_walk_forward_validation")
+    if record.get("authoritative") is not True:
+        reasons.append("not_authoritative_nautilus_validation")
+
+    window_results = record.get("trainingWindowResults", []) + record.get("perWindowResults", [])
+    if not window_results:
+        reasons.append("missing_nautilus_window_results")
+    for index, window in enumerate(window_results, start=1):
+        provenance = window.get("nautilusTrader")
+        if not _has_required_nautilus_provenance(provenance):
+            reasons.append(f"missing_required_nautilus_provenance_window_{index}")
+
+    if any(
+        not _has_required_nautilus_provenance(result.nautilus_provenance)
+        for result in candidate.result.training_window_results
+    ):
+        reasons.append("missing_required_training_result_nautilus_provenance")
+    if any(
+        not _has_required_nautilus_provenance(result.nautilus_provenance)
+        for result in candidate.result.window_results
+    ):
+        reasons.append("missing_required_scoring_result_nautilus_provenance")
+    return reasons
+
+
+def _has_required_nautilus_provenance(provenance: Any) -> bool:
+    if not isinstance(provenance, dict):
+        return False
+    return (
+        provenance.get("package") == "nautilus_trader"
+        and isinstance(provenance.get("version"), str)
+        and bool(provenance.get("version"))
+        and isinstance(provenance.get("moduleFile"), str)
+        and bool(provenance.get("moduleFile"))
+        and provenance.get("engine") == "BacktestEngine"
+        and provenance.get("runtimeImportFromThirdPartyReference") is False
     )
 
 
@@ -417,8 +502,9 @@ def _write_search_registry_record(
     fitness_constraints: FitnessConstraints,
     generated_candidates: List[JsonObject],
     evaluated_candidates: List[EvaluatedSearchCandidate],
+    surviving_candidates: List[EvaluatedSearchCandidate],
     rejected_candidates: List[JsonObject],
-    winning_candidate: EvaluatedSearchCandidate,
+    winning_candidate: Optional[EvaluatedSearchCandidate],
 ) -> Path:
     run_id = _search_run_id(
         dataset_path,
@@ -431,11 +517,18 @@ def _write_search_registry_record(
     search_path = registry_path / "searches" / run_id
     search_path.mkdir(parents=True, exist_ok=True)
     dataset_record = _snapshot_dataset(search_path, dataset_path)
-    winning_run_artifact = _copy_winning_run_artifacts(search_path, winning_candidate)
+    winning_run_artifact = (
+        _copy_winning_run_artifacts(search_path, winning_candidate)
+        if winning_candidate
+        else None
+    )
+    ranked_survivors = _rank_survivors(surviving_candidates)
+    best_rejected_candidate = _best_rejected_candidate(evaluated_candidates, surviving_candidates)
     record = {
         "runId": run_id,
-        "recordType": "Evaluator Replay Search Helper",
-        "authoritative": False,
+        "recordType": "Nautilus Validation Search",
+        "authoritative": True,
+        "status": "completed" if winning_candidate else "completed_no_survivors",
         "evaluatorVersion": EVALUATOR_VERSION,
         "dataset": dataset_record,
         "optimizerConfig": _search_config_to_json(search_config),
@@ -444,15 +537,18 @@ def _write_search_registry_record(
         "fitnessConstraints": _fitness_constraints_to_json(fitness_constraints),
         "generatedCandidates": generated_candidates,
         "evaluatedSpecs": [_evaluated_candidate_to_json(candidate) for candidate in evaluated_candidates],
+        "survivingCandidates": [_evaluated_candidate_to_json(candidate) for candidate in ranked_survivors],
         "rejectedCandidates": rejected_candidates,
-        "ranking": [candidate.strategy_id for candidate in _rank_candidates(evaluated_candidates)],
-        "winningRun": {
-            "candidateId": winning_candidate.candidate_id,
-            "strategyId": winning_candidate.strategy_id,
-            "strategySpec": winning_candidate.strategy_spec,
-            "fitness": _fitness_to_json(winning_candidate.fitness),
-            "sourceRunRecord": str(winning_candidate.result.registry_record_path),
-            "artifacts": {"runRecord": winning_run_artifact},
+        "ranking": [candidate.strategy_id for candidate in ranked_survivors],
+        "bestRejectedCandidate": _best_rejected_candidate_to_json(best_rejected_candidate),
+        "winningRun": _winning_candidate_to_json(winning_candidate, winning_run_artifact),
+        "reproducibilityInputs": {
+            "datasetSnapshot": dataset_record["artifacts"]["snapshot"],
+            "optimizerConfig": _search_config_to_json(search_config),
+            "costModel": _cost_model_to_json(cost_model),
+            "walkForward": _walk_forward_config_to_json(walk_forward),
+            "fitnessConstraints": _fitness_constraints_to_json(fitness_constraints),
+            "generatedCandidatesHash": _json_hash(generated_candidates),
         },
     }
     record_path = search_path / "search.json"
@@ -498,6 +594,83 @@ def _evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate) -> JsonObj
         "registryRecord": str(candidate.result.registry_record_path),
         "fitness": _fitness_to_json(candidate.fitness),
     }
+
+
+def _rejected_evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate, reasons: Sequence[str]) -> JsonObject:
+    return {
+        "candidateId": candidate.candidate_id,
+        "strategyId": candidate.strategy_id,
+        "source": "evaluated",
+        "strategySpec": candidate.strategy_spec,
+        "optimizerPhase": candidate.optimizer_phase,
+        "registryRecord": str(candidate.result.registry_record_path),
+        "rejectionReasons": list(reasons),
+        "fitness": _fitness_to_json(candidate.fitness),
+    }
+
+
+def _winning_candidate_to_json(
+    candidate: Optional[EvaluatedSearchCandidate],
+    winning_run_artifact: Optional[str],
+) -> Optional[JsonObject]:
+    if candidate is None:
+        return None
+    return {
+        "candidateId": candidate.candidate_id,
+        "strategyId": candidate.strategy_id,
+        "strategySpec": candidate.strategy_spec,
+        "fitness": _fitness_to_json(candidate.fitness),
+        "sourceRunRecord": str(candidate.result.registry_record_path),
+        "provenance": {
+            "recordType": "Nautilus Walk-Forward Validation",
+            "requiredNautilusProvenance": True,
+        },
+        "artifacts": {"runRecord": winning_run_artifact},
+    }
+
+
+def _best_rejected_candidate(
+    evaluated_candidates: List[EvaluatedSearchCandidate],
+    surviving_candidates: List[EvaluatedSearchCandidate],
+) -> Optional[EvaluatedSearchCandidate]:
+    survivor_ids = {(candidate.candidate_id, candidate.strategy_id) for candidate in surviving_candidates}
+    rejected = [
+        candidate
+        for candidate in evaluated_candidates
+        if (candidate.candidate_id, candidate.strategy_id) not in survivor_ids
+    ]
+    if not rejected:
+        return None
+    return sorted(rejected, key=_diagnostic_rank_key, reverse=True)[0]
+
+
+def _best_rejected_candidate_to_json(candidate: Optional[EvaluatedSearchCandidate]) -> Optional[JsonObject]:
+    if candidate is None:
+        return None
+    return {
+        "candidateId": candidate.candidate_id,
+        "strategyId": candidate.strategy_id,
+        "strategySpec": candidate.strategy_spec,
+        "fitness": _fitness_to_json(candidate.fitness),
+        "diagnosticOnly": True,
+    }
+
+
+def _dedupe_rejected_candidates(rejected_candidates: List[JsonObject]) -> List[JsonObject]:
+    deduped: List[JsonObject] = []
+    seen = set()
+    for candidate in rejected_candidates:
+        key = (
+            candidate.get("candidateId"),
+            candidate.get("strategyId"),
+            tuple(candidate.get("rejectionReasons", [])),
+            candidate.get("error"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
 
 
 def _search_run_id(
@@ -582,3 +755,7 @@ def _fitness_to_json(fitness) -> JsonObject:
         "survivalChecks": fitness.survival_checks,
         "rankingInputs": fitness.ranking_inputs,
     }
+
+
+def _json_hash(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode("utf-8")).hexdigest()

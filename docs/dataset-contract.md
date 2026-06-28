@@ -58,9 +58,12 @@ supports deterministic, seeded random, and Optuna-style bounded trial ordering,
 evaluates every valid candidate through walk-forward validation, ranks survivors
 by multi-constraint Fitness Score, and writes a search registry record with the
 optimizer configuration, generated candidates, evaluated specs, rejected
-proposals, evaluator version, dataset version metadata, a dataset snapshot, and
-winning run artifacts. LLM-proposed candidates are accepted only as candidate
-specs and are validated before they can be evaluated or ranked.
+proposals, surviving candidates, evaluator version, dataset version metadata, a
+dataset snapshot, reproducibility inputs, and winning run artifacts when a real
+Nautilus Validation survivor exists. If no candidate survives, the search
+completes with no winner and may report only a diagnostic best rejected
+candidate. LLM-proposed candidates are accepted only as candidate specs and are
+validated before they can be evaluated or ranked.
 
 ## Manifest
 
