@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "test": "vitest",
+    "test:python": "python3 -m unittest discover -s evaluator/tests",
     "collect:es-rth-5m": "node --env-file=.env examples/CollectEsRth5mDataset.js",
     "example": "node --env-file=.env",
     "example:dev": "nodemon --env-file=.env"

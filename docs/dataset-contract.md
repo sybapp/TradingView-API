@@ -10,6 +10,21 @@ A dataset is a directory containing:
 
 The collector writes this directory. The evaluator reads it. Backtests must not call TradingView live.
 
+The first Python evaluator boundary lives in `evaluator/nautilus_evaluator`.
+It exposes:
+
+- `load_versioned_dataset(dataset_path)`
+- `to_nautilus_bar_inputs(dataset)`
+- `to_nautilus_bars(dataset)` when `nautilus_trader` is installed
+- `run_smoke_backtest(dataset_path)`
+
+The smoke path can be run against the fixture dataset without calling
+TradingView:
+
+```sh
+python3 -m evaluator tests/fixtures/es-rth-5m-dataset
+```
+
 ## Manifest
 
 `manifest.json` describes the immutable dataset:
