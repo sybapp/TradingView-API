@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 
 JsonObject = Dict[str, Any]
@@ -31,10 +31,16 @@ class RiskControls:
 
 
 @dataclass(frozen=True)
+class Exits:
+    max_bars_in_trade: Optional[int]
+
+
+@dataclass(frozen=True)
 class StrategySpec:
     raw: JsonObject
     strategy_id: str
     entry_rules: List[FeatureEqualsEntryRule]
+    exits: Exits
     sizing: FixedSizing
     risk_controls: RiskControls
 
@@ -42,6 +48,22 @@ class StrategySpec:
 def validate_strategy_spec(value: Mapping[str, Any]) -> StrategySpec:
     errors: List[str] = []
     raw = dict(value)
+    _reject_unknown_keys(
+        raw,
+        {
+            "schemaVersion",
+            "strategyId",
+            "description",
+            "parameters",
+            "entryRules",
+            "exits",
+            "sizing",
+            "riskControls",
+            "tunableParameters",
+        },
+        "Strategy Spec",
+        errors,
+    )
 
     if raw.get("schemaVersion") != 1:
         errors.append("schemaVersion must be 1")
@@ -54,11 +76,7 @@ def validate_strategy_spec(value: Mapping[str, Any]) -> StrategySpec:
     sizing = _parse_sizing(raw.get("sizing"), errors)
     risk_controls = _parse_risk_controls(raw.get("riskControls"), errors)
 
-    exits = raw.get("exits")
-    if not isinstance(exits, dict):
-        errors.append("exits must be an object")
-    elif "maxBarsInTrade" in exits and not _is_positive_int(exits["maxBarsInTrade"]):
-        errors.append("exits.maxBarsInTrade must be a positive integer")
+    exits = _parse_exits(raw.get("exits"), errors)
 
     tunable_parameters = raw.get("tunableParameters")
     if not isinstance(tunable_parameters, dict):
@@ -75,6 +93,7 @@ def validate_strategy_spec(value: Mapping[str, Any]) -> StrategySpec:
         raw=raw,
         strategy_id=strategy_id,
         entry_rules=entry_rules,
+        exits=exits,
         sizing=sizing,
         risk_controls=risk_controls,
     )
@@ -91,12 +110,14 @@ def _parse_entry_rules(value: Any, errors: List[str]) -> List[FeatureEqualsEntry
         if not isinstance(rule, dict):
             errors.append(f"{path} must be an object")
             continue
+        _reject_unknown_keys(rule, {"type", "feature", "value", "side"}, path, errors)
         if rule.get("type") != "feature_equals":
             errors.append(f"{path}.type must be feature_equals")
         feature = rule.get("feature")
         if not isinstance(feature, dict):
             errors.append(f"{path}.feature must be an object")
             continue
+        _reject_unknown_keys(feature, {"indicatorId", "name"}, f"{path}.feature", errors)
         indicator_id = feature.get("indicatorId")
         name = feature.get("name")
         side = rule.get("side")
@@ -124,6 +145,7 @@ def _parse_sizing(value: Any, errors: List[str]) -> FixedSizing:
     if not isinstance(value, dict):
         errors.append("sizing must be an object")
         return FixedSizing(quantity=0)
+    _reject_unknown_keys(value, {"type", "quantity"}, "sizing", errors)
     if value.get("type") != "fixed":
         errors.append("sizing.type must be fixed")
     quantity = value.get("quantity")
@@ -133,10 +155,31 @@ def _parse_sizing(value: Any, errors: List[str]) -> FixedSizing:
     return FixedSizing(quantity=quantity)
 
 
+def _parse_exits(value: Any, errors: List[str]) -> Exits:
+    if not isinstance(value, dict):
+        errors.append("exits must be an object")
+        return Exits(max_bars_in_trade=None)
+
+    _reject_unknown_keys(value, {"maxBarsInTrade"}, "exits", errors)
+    max_bars = value.get("maxBarsInTrade")
+    if max_bars is None:
+        return Exits(max_bars_in_trade=None)
+    if not _is_positive_int(max_bars):
+        errors.append("exits.maxBarsInTrade must be a positive integer")
+        return Exits(max_bars_in_trade=None)
+    return Exits(max_bars_in_trade=max_bars)
+
+
 def _parse_risk_controls(value: Any, errors: List[str]) -> RiskControls:
     if not isinstance(value, dict):
         errors.append("riskControls must be an object")
         return RiskControls(False, 0, 0, 0)
+    _reject_unknown_keys(
+        value,
+        {"intradayFlat", "flatBeforeCloseMinutes", "stopLossTicks", "takeProfitTicks"},
+        "riskControls",
+        errors,
+    )
 
     intraday_flat = value.get("intradayFlat")
     flat_before_close_minutes = value.get("flatBeforeCloseMinutes")
@@ -166,3 +209,13 @@ def _is_positive_int(value: Any) -> bool:
 
 def _is_non_negative_int(value: Any) -> bool:
     return isinstance(value, int) and value >= 0
+
+
+def _reject_unknown_keys(
+    value: Mapping[str, Any],
+    allowed: set[str],
+    path: str,
+    errors: List[str],
+) -> None:
+    for key in sorted(set(value) - allowed):
+        errors.append(f"{path}.{key} is unsupported")

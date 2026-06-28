@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 import hashlib
@@ -15,7 +15,7 @@ import sys
 from typing import Any, Dict, List, Mapping, Optional, Union
 from zoneinfo import ZoneInfo
 
-from .dataset import FeatureRecord, VersionedDataset, load_versioned_dataset
+from .dataset import DatasetBar, FeatureRecord, VersionedDataset, load_versioned_dataset
 from .nautilus import (
     concrete_bar_type_string,
     timestamp_to_nanoseconds,
@@ -34,6 +34,22 @@ class _PendingSignal:
         self.quantity = quantity
         self.reason = reason
         self.signal_bar_ns = signal_bar_ns
+
+
+@dataclass(frozen=True)
+class _SessionWindow:
+    session_id: str
+    first_bar_ns: int
+    last_bar_ns: int
+    flat_at_ns: int
+
+
+@dataclass(frozen=True)
+class _OpenPosition:
+    quantity: int
+    entry_bar_ns: int
+    entry_bar_index: int
+    entry_price: float
 
 
 def run_nautilus_validation_backtest(
@@ -58,7 +74,7 @@ def run_nautilus_validation_backtest(
     _validate_instrument_cost_mapping(cost_model, instrument)
     engine = nautilus["BacktestEngine"](
         config=nautilus["BacktestEngineConfig"](
-            logging=nautilus["LoggingConfig"](log_level="ERROR"),
+            logging=nautilus["LoggingConfig"](log_level="ERROR", bypass_logging=True),
             run_analysis=False,
         ),
     )
@@ -86,6 +102,7 @@ def run_nautilus_validation_backtest(
         spec=spec,
         instrument_id=instrument.id,
         bar_type=bar_type,
+        tick_size=cost_model.tick_size,
     )
     engine.add_strategy(strategy)
     try:
@@ -141,16 +158,23 @@ class _StrategySpecNautilusAdapter:
                 spec: StrategySpec,
                 instrument_id: Any,
                 bar_type: Any,
+                tick_size: float,
             ):
                 super().__init__()
                 self.dataset = dataset
                 self.spec = spec
                 self.instrument_id = instrument_id
                 self.bar_type = bar_type
+                self.tick_size = tick_size
                 self.pending_signal: Optional[_PendingSignal] = None
                 self.submitted_orders: Dict[str, Dict[str, Any]] = {}
-                self.position_quantity = 0
-                self.flat_at_ns = _flat_at_nanoseconds(dataset, spec.risk_controls.flat_before_close_minutes)
+                self.open_position: Optional[_OpenPosition] = None
+                self.entry_taken = False
+                self.bars_by_ns = {timestamp_to_nanoseconds(item.time): item for item in dataset.bars}
+                self.bar_indices_by_ns = {
+                    timestamp_to_nanoseconds(item.time): index for index, item in enumerate(dataset.bars)
+                }
+                self.session_windows = _session_windows(dataset, spec.risk_controls.flat_before_close_minutes)
 
             def on_start(self):
                 self.subscribe_bars(self.bar_type)
@@ -159,22 +183,32 @@ class _StrategySpecNautilusAdapter:
                 if self.pending_signal is not None:
                     self._submit_pending_signal(bar)
 
-                if bar.ts_event >= self.flat_at_ns and self.position_quantity > 0:
+                exit_reason = self._exit_reason(bar)
+                if self.open_position is not None and exit_reason is not None:
                     self._submit_order(
                         side="sell",
-                        quantity=self.position_quantity,
-                        reason="intraday-flat-before-close",
+                        quantity=self.open_position.quantity,
+                        reason=exit_reason,
                         signal_bar_ns=bar.ts_event,
+                        execution_bar_ns=bar.ts_event,
                     )
                     return
 
-                if self.pending_signal is not None or self.position_quantity != 0:
+                if self.pending_signal is not None or self.open_position is not None or self.entry_taken:
                     return
 
                 if not self._next_bar_can_execute_before_flat(bar.ts_event):
                     return
 
-                matched_rule = _matching_entry_rule(self.spec.entry_rules, self.dataset.features, bar.ts_event)
+                session = self._session_for_bar(bar.ts_event)
+                if session is None:
+                    return
+                matched_rule = _matching_entry_rule(
+                    self.spec.entry_rules,
+                    self.dataset.features,
+                    bar.ts_event,
+                    earliest_feature_ns=session.first_bar_ns,
+                )
                 if matched_rule is not None:
                     self.pending_signal = _PendingSignal(
                         side="buy",
@@ -191,9 +225,18 @@ class _StrategySpecNautilusAdapter:
                     quantity=pending.quantity,
                     reason=pending.reason,
                     signal_bar_ns=pending.signal_bar_ns,
+                    execution_bar_ns=bar.ts_event,
                 )
 
-            def _submit_order(self, *, side: str, quantity: int, reason: str, signal_bar_ns: int):
+            def _submit_order(
+                self,
+                *,
+                side: str,
+                quantity: int,
+                reason: str,
+                signal_bar_ns: int,
+                execution_bar_ns: int,
+            ):
                 order_side = nautilus["OrderSide"].BUY if side == "buy" else nautilus["OrderSide"].SELL
                 instrument = self.cache.instrument(self.instrument_id)
                 order = self.order_factory.market(
@@ -209,22 +252,77 @@ class _StrategySpecNautilusAdapter:
                 }
                 self.submit_order(order)
                 if side == "buy":
-                    self.position_quantity += quantity
+                    self.entry_taken = True
+                    self.open_position = _OpenPosition(
+                        quantity=quantity,
+                        entry_bar_ns=execution_bar_ns,
+                        entry_bar_index=self.bar_indices_by_ns[execution_bar_ns],
+                        entry_price=self.bars_by_ns[execution_bar_ns].open,
+                    )
                 else:
-                    self.position_quantity -= quantity
+                    self.open_position = None
 
             def _next_bar_can_execute_before_flat(self, current_bar_ns: int) -> bool:
-                for candidate in self.dataset.bars:
-                    candidate_ns = timestamp_to_nanoseconds(candidate.time)
-                    if candidate_ns > current_bar_ns:
-                        return candidate_ns < self.flat_at_ns
-                return False
+                next_bar = self._next_dataset_bar(current_bar_ns)
+                if next_bar is None:
+                    return False
+                current_session = self._session_for_bar(current_bar_ns)
+                next_session = self._session_for_bar(timestamp_to_nanoseconds(next_bar.time))
+                return (
+                    current_session is not None
+                    and next_session is not None
+                    and current_session.session_id == next_session.session_id
+                    and timestamp_to_nanoseconds(next_bar.time) < current_session.flat_at_ns
+                )
+
+            def _exit_reason(self, bar) -> Optional[str]:
+                position = self.open_position
+                if position is None:
+                    return None
+
+                session = self._session_for_bar(bar.ts_event)
+                if session is not None and bar.ts_event >= session.flat_at_ns:
+                    return "intraday-flat-before-close"
+
+                dataset_bar = self.bars_by_ns[bar.ts_event]
+                stop_price = position.entry_price - (
+                    self.spec.risk_controls.stop_loss_ticks * self.tick_size
+                )
+                if dataset_bar.low <= stop_price:
+                    return "stop-loss"
+
+                take_profit_price = position.entry_price + (
+                    self.spec.risk_controls.take_profit_ticks * self.tick_size
+                )
+                if dataset_bar.high >= take_profit_price:
+                    return "take-profit"
+
+                max_bars = self.spec.exits.max_bars_in_trade
+                if max_bars is not None:
+                    current_index = self.bar_indices_by_ns[bar.ts_event]
+                    if current_index - position.entry_bar_index >= max_bars:
+                        return "max-bars-in-trade"
+
+                return None
+
+            def _next_dataset_bar(self, current_bar_ns: int) -> Optional[DatasetBar]:
+                current_index = self.bar_indices_by_ns.get(current_bar_ns)
+                if current_index is None or current_index + 1 >= len(self.dataset.bars):
+                    return None
+                return self.dataset.bars[current_index + 1]
+
+            def _session_for_bar(self, bar_ns: int) -> Optional[_SessionWindow]:
+                for session in self.session_windows:
+                    if session.first_bar_ns <= bar_ns <= session.last_bar_ns:
+                        return session
+                return None
 
         return StrategySpecNautilusAdapter(
             dataset=kwargs["dataset"],
             spec=kwargs["spec"],
             instrument_id=kwargs["instrument_id"],
             bar_type=kwargs["bar_type"],
+            tick_size=kwargs["tick_size"],
         )
 
 
@@ -292,11 +390,17 @@ def _matching_entry_rule(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
     bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
 ) -> Optional[FeatureEqualsEntryRule]:
     available_features = [
         feature
         for feature in features
         if timestamp_to_nanoseconds(feature.availability_time) <= bar_time_ns
+        and (
+            earliest_feature_ns is None
+            or timestamp_to_nanoseconds(feature.availability_time) >= earliest_feature_ns
+        )
     ]
     for rule in rules:
         if any(
@@ -309,14 +413,60 @@ def _matching_entry_rule(
     return None
 
 
-def _flat_at_nanoseconds(dataset: VersionedDataset, flat_before_close_minutes: int) -> int:
+def _session_windows(dataset: VersionedDataset, flat_before_close_minutes: int) -> List[_SessionWindow]:
+    declared_sessions = dataset.manifest["session"].get("sessions")
+    if isinstance(declared_sessions, list) and declared_sessions:
+        return [
+            _SessionWindow(
+                session_id=str(item["id"]),
+                first_bar_ns=timestamp_to_nanoseconds(_parse_manifest_timestamp(str(item["firstBarTime"]))),
+                last_bar_ns=timestamp_to_nanoseconds(_parse_manifest_timestamp(str(item["lastBarTime"]))),
+                flat_at_ns=_flat_at_for_session_date(
+                    dataset,
+                    _parse_manifest_timestamp(str(item["firstBarTime"])),
+                    flat_before_close_minutes,
+                ),
+            )
+            for item in declared_sessions
+        ]
+
+    timezone = ZoneInfo(str(dataset.manifest["session"]["timezone"]))
+    windows: List[_SessionWindow] = []
+    bars_by_date: Dict[str, List[DatasetBar]] = {}
+    for bar in dataset.bars:
+        session_id = bar.time.astimezone(timezone).date().isoformat()
+        bars_by_date.setdefault(session_id, []).append(bar)
+    for session_id, bars in bars_by_date.items():
+        windows.append(
+            _SessionWindow(
+                session_id=session_id,
+                first_bar_ns=timestamp_to_nanoseconds(bars[0].time),
+                last_bar_ns=timestamp_to_nanoseconds(bars[-1].time),
+                flat_at_ns=_flat_at_for_session_date(dataset, bars[0].time, flat_before_close_minutes),
+            )
+        )
+    return windows
+
+
+def _flat_at_for_session_date(
+    dataset: VersionedDataset,
+    session_time: datetime,
+    flat_before_close_minutes: int,
+) -> int:
     session = dataset.manifest["session"]
     timezone = ZoneInfo(str(session["timezone"]))
     session_end = time.fromisoformat(str(session["end"]))
-    first_bar_date = dataset.bars[0].time.astimezone(timezone).date()
-    session_close = datetime.combine(first_bar_date, session_end, tzinfo=timezone)
+    session_date = session_time.astimezone(timezone).date()
+    session_close = datetime.combine(session_date, session_end, tzinfo=timezone)
     flat_at = session_close - timedelta(minutes=flat_before_close_minutes)
     return timestamp_to_nanoseconds(flat_at)
+
+
+def _parse_manifest_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=ZoneInfo("UTC"))
+    return parsed.astimezone(ZoneInfo("UTC"))
 
 
 def _orders_from_fills(
@@ -326,6 +476,8 @@ def _orders_from_fills(
     price_scale: int,
 ) -> List[StrategyOrder]:
     orders: List[StrategyOrder] = []
+    if "ts_last" not in fills_report.columns:
+        return orders
     for client_order_id, row in fills_report.sort_values("ts_last").iterrows():
         submitted = submitted_orders[str(client_order_id)]
         commission = _commission_to_scaled_int(row["commissions"], price_scale)
