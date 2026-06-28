@@ -8,6 +8,15 @@ from .dataset import (
 )
 from .nautilus import NautilusBarInput, to_nautilus_bar_inputs, to_nautilus_bars
 from .smoke import SmokeBacktestResult, run_smoke_backtest
+from .search import (
+    BoundedSearchConfig,
+    EvaluatedSearchCandidate,
+    StrategySearchResult,
+    StrategyTemplate,
+    generate_bounded_template_specs,
+    reproduce_search_winner,
+    run_bounded_strategy_search,
+)
 from .strategy import (
     CostModel,
     FitnessConstraints,
@@ -25,8 +34,10 @@ from .strategy import (
 from .strategy_spec import StrategySpec, validate_strategy_spec
 
 __all__ = [
+    "BoundedSearchConfig",
     "CostModel",
     "DatasetBar",
+    "EvaluatedSearchCandidate",
     "FeatureRecord",
     "FitnessConstraints",
     "FitnessResult",
@@ -34,14 +45,19 @@ __all__ = [
     "SmokeBacktestResult",
     "StrategyBacktestResult",
     "StrategyOrder",
+    "StrategySearchResult",
     "StrategySpec",
+    "StrategyTemplate",
     "VersionedDataset",
     "WalkForwardBacktestResult",
     "WalkForwardConfig",
     "WalkForwardWindow",
     "WalkForwardWindowResult",
     "WindowRange",
+    "generate_bounded_template_specs",
     "load_versioned_dataset",
+    "reproduce_search_winner",
+    "run_bounded_strategy_search",
     "run_smoke_backtest",
     "run_strategy_backtest",
     "run_walk_forward_backtest",

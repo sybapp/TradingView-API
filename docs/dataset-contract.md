@@ -19,6 +19,9 @@ It exposes:
 - `run_smoke_backtest(dataset_path)`
 - `validate_strategy_spec(strategy_spec)`
 - `run_strategy_backtest(dataset_path, strategy_spec, cost_model, registry_path)`
+- `generate_bounded_template_specs(templates, search_config)`
+- `run_bounded_strategy_search(dataset_path, templates, cost_model, registry_path, walk_forward, fitness_constraints, search_config, proposed_candidates=None)`
+- `reproduce_search_winner(search_registry_record_path)`
 
 The smoke path can be run against the fixture dataset without calling
 TradingView:
@@ -41,6 +44,16 @@ Nautilus-compatible bar replay strategy, evaluates entry signals after bar
 close, executes orders on the next bar, applies fixed fees and slippage, forces
 the strategy flat before RTH close, and writes a reproducible `run.json` plus
 `orders.json` artifact.
+
+The first bounded Strategy Spec search loop lives in the same Python package.
+It generates schema-valid specs from constrained `StrategyTemplate` choices,
+supports deterministic, seeded random, and Optuna-style bounded trial ordering,
+evaluates every valid candidate through walk-forward validation, ranks survivors
+by multi-constraint Fitness Score, and writes a search registry record with the
+optimizer configuration, generated candidates, evaluated specs, rejected
+proposals, evaluator version, dataset version metadata, a dataset snapshot, and
+winning run artifacts. LLM-proposed candidates are accepted only as candidate
+specs and are validated before they can be evaluated or ranked.
 
 ## Manifest
 
