@@ -135,13 +135,22 @@ class StrategySearchTests(unittest.TestCase):
                 ["exploration", "exploration", "exploitation", "exploitation"],
             )
             self.assertEqual(search_record["ranking"][0], result.winning_candidate.strategy_id)
+            self.assertEqual(
+                [candidate["candidateId"] for candidate in search_record["evaluatedSpecs"]],
+                ["candidate-1", "candidate-2", "candidate-3", "candidate-4"],
+            )
             self.assertEqual(search_record["winningRun"]["strategySpec"], result.winning_candidate.strategy_spec)
             self.assertEqual(search_record["winningRun"]["provenance"]["recordType"], "Nautilus Walk-Forward Validation")
             self.assertTrue(search_record["winningRun"]["provenance"]["requiredNautilusProvenance"])
             self.assertIsNotNone(search_record["bestRejectedCandidate"])
             self.assertTrue(search_record["bestRejectedCandidate"]["diagnosticOnly"])
             self.assertIn("reproducibilityInputs", search_record)
-            self.assertTrue((result.registry_record_path.parent / search_record["winningRun"]["artifacts"]["runRecord"]).exists())
+            self.assertTrue(
+                (result.registry_record_path.parent / search_record["winningRun"]["artifacts"]["runRecord"]).exists()
+            )
+            self.assertTrue(
+                (result.registry_record_path.parent / search_record["winningRun"]["artifacts"]["ordersByWindow"]).exists()
+            )
 
             shutil.rmtree(dataset_path)
             reproduced = reproduce_search_winner(result.registry_record_path)
@@ -209,6 +218,42 @@ class StrategySearchTests(unittest.TestCase):
             self.assertIn("schemaVersion must be 1", result.rejected_candidates[0]["error"])
             self.assertEqual([candidate.strategy_id for candidate in result.evaluated_candidates], ["valid-llm-proposal"])
             self.assertEqual([candidate.strategy_id for candidate in result.surviving_candidates], ["valid-llm-proposal"])
+
+    def test_proposed_candidates_cannot_exceed_remaining_search_budget(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_search_dataset(Path(temp_dir) / "dataset")
+            template = StrategyTemplate(
+                template_id="budget-template",
+                base_spec=BASE_SPEC,
+                choices={
+                    "entryRules.0.value": [1, -1],
+                    "sizing.quantity": [1],
+                },
+            )
+            proposed = [
+                {**BASE_SPEC, "strategyId": "proposed-over-budget-1"},
+                {**BASE_SPEC, "strategyId": "proposed-over-budget-2"},
+            ]
+
+            result = run_bounded_strategy_search(
+                dataset_path=dataset_path,
+                templates=[template],
+                proposed_candidates=proposed,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1),
+                fitness_constraints=FitnessConstraints(min_trades=0, min_profitable_windows=0),
+                search_config=BoundedSearchConfig(method="deterministic", max_candidates=2),
+            )
+
+            self.assertEqual(len(result.generated_candidates), 2)
+            self.assertEqual(
+                [candidate.strategy_id for candidate in result.evaluated_candidates],
+                [
+                    "budget-template-1",
+                    "budget-template-2",
+                ],
+            )
 
 
 def _write_search_dataset(path: Path):

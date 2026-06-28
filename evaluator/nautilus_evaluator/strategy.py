@@ -57,9 +57,6 @@ class WalkForwardConfig:
     training_sessions: Optional[int] = None
     scoring_sessions: Optional[int] = None
     step_sessions: Optional[int] = None
-    training_bars: Optional[int] = None
-    scoring_bars: Optional[int] = None
-    step_bars: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +104,14 @@ class WalkForwardWindowResult:
     max_drawdown: int
     result_summary: Dict[str, Any]
     nautilus_provenance: Dict[str, Any]
+    environment: Dict[str, Any]
+    instrument: Dict[str, Any]
+    venue: Dict[str, Any]
+    bar_type: Dict[str, Any]
+    cost_configuration: Dict[str, Any]
+    fills_report: Any
+    positions_report: Any
+    account_report: Any
 
 
 @dataclass(frozen=True)
@@ -156,13 +161,6 @@ def run_strategy_backtest(
     dataset = load_versioned_dataset(dataset_path)
     spec = validate_strategy_spec(strategy_spec)
     result = _evaluate_dataset_slice(dataset=dataset, spec=spec, cost_model=cost_model)
-    record_path = _write_run_registry_record(
-        registry_path=Path(registry_path),
-        dataset=dataset,
-        spec=spec,
-        cost_model=cost_model,
-        result=result,
-    )
     return StrategyBacktestResult(
         dataset_id=result.dataset_id,
         strategy_id=result.strategy_id,
@@ -172,7 +170,7 @@ def run_strategy_backtest(
         gross_pnl=result.gross_pnl,
         total_costs=result.total_costs,
         net_pnl=result.net_pnl,
-        registry_record_path=record_path,
+        registry_record_path=Path(),
     )
 
 
@@ -444,23 +442,13 @@ def _build_walk_forward_windows(
 
 def _normalized_walk_forward_sessions(config: WalkForwardConfig) -> tuple[int, int, int]:
     has_session_fields = config.training_sessions is not None or config.scoring_sessions is not None
-    has_bar_fields = config.training_bars is not None or config.scoring_bars is not None
-    if has_session_fields and has_bar_fields:
-        raise ValueError("walk_forward cannot mix session-based fields with legacy bar-based fields")
-    if has_session_fields:
-        if config.training_sessions is None or config.scoring_sessions is None:
-            raise ValueError("walk_forward.training_sessions and walk_forward.scoring_sessions must be provided together")
-        training_sessions = config.training_sessions
-        scoring_sessions = config.scoring_sessions
-        step_sessions = config.step_sessions if config.step_sessions is not None else scoring_sessions
-    elif has_bar_fields:
-        if config.training_bars is None or config.scoring_bars is None:
-            raise ValueError("walk_forward.training_bars and walk_forward.scoring_bars must be provided together")
-        training_sessions = config.training_bars
-        scoring_sessions = config.scoring_bars
-        step_sessions = config.step_bars if config.step_bars is not None else scoring_sessions
-    else:
+    if not has_session_fields:
         raise ValueError("walk_forward requires training_sessions and scoring_sessions")
+    if config.training_sessions is None or config.scoring_sessions is None:
+        raise ValueError("walk_forward.training_sessions and walk_forward.scoring_sessions must be provided together")
+    training_sessions = config.training_sessions
+    scoring_sessions = config.scoring_sessions
+    step_sessions = config.step_sessions if config.step_sessions is not None else scoring_sessions
 
     if training_sessions <= 0:
         raise ValueError("walk_forward.training_sessions must be positive")
@@ -596,6 +584,14 @@ def _walk_forward_result(
         max_drawdown=_max_drawdown(_trade_net_pnls(result.orders)),
         result_summary=_result_summary(result),
         nautilus_provenance=validation.nautilus_provenance,
+        environment=validation.environment,
+        instrument=validation.instrument,
+        venue=validation.venue,
+        bar_type=validation.bar_type,
+        cost_configuration=validation.cost_configuration,
+        fills_report=validation.fills_report,
+        positions_report=validation.positions_report,
+        account_report=validation.account_report,
     )
 
 
@@ -859,11 +855,17 @@ def _write_walk_forward_registry_record(
             "windows": [_walk_forward_window_to_json(window) for window in windows],
         },
         "trainingWindowResults": [
-            _walk_forward_window_result_to_json(result)
+            _walk_forward_window_result_to_json(
+                result,
+                artifacts=_write_walk_forward_window_artifacts(run_path, "training", result),
+            )
             for result in training_window_results
         ],
         "perWindowResults": [
-            _walk_forward_window_result_to_json(result)
+            _walk_forward_window_result_to_json(
+                result,
+                artifacts=_write_walk_forward_window_artifacts(run_path, "scoring", result),
+            )
             for result in scoring_window_results
         ],
         "fitness": _fitness_to_json(fitness),
@@ -874,6 +876,31 @@ def _write_walk_forward_registry_record(
     record_path = run_path / "run.json"
     record_path.write_text(json.dumps(record, indent=2, sort_keys=True), encoding="utf-8")
     return record_path
+
+
+def _write_walk_forward_window_artifacts(
+    run_path: Path,
+    phase: str,
+    result: WalkForwardWindowResult,
+) -> Dict[str, Any]:
+    reports_path = run_path / "nautilus-reports"
+    reports_path.mkdir(exist_ok=True)
+    prefix = f"{phase}-{result.window_id}"
+    fills_path = reports_path / f"{prefix}-order-fills.csv"
+    positions_path = reports_path / f"{prefix}-positions.csv"
+    account_path = reports_path / f"{prefix}-account.csv"
+
+    result.fills_report.to_csv(fills_path)
+    result.positions_report.to_csv(positions_path)
+    result.account_report.to_csv(account_path)
+
+    return {
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": f"{phase}:{result.window_id}",
+        "nautilusOrderFills": str(fills_path.relative_to(run_path)),
+        "nautilusPositions": str(positions_path.relative_to(run_path)),
+        "nautilusAccount": str(account_path.relative_to(run_path)),
+    }
 
 
 def _run_id(dataset: VersionedDataset, spec: StrategySpec, cost_model: CostModel) -> str:
@@ -944,7 +971,11 @@ def _window_range_to_json(window_range: WindowRange) -> Dict[str, Any]:
     }
 
 
-def _walk_forward_window_result_to_json(result: WalkForwardWindowResult) -> Dict[str, Any]:
+def _walk_forward_window_result_to_json(
+    result: WalkForwardWindowResult,
+    *,
+    artifacts: Dict[str, Any],
+) -> Dict[str, Any]:
     return {
         "windowId": result.window_id,
         "startSessionDate": result.start_session_date,
@@ -959,6 +990,12 @@ def _walk_forward_window_result_to_json(result: WalkForwardWindowResult) -> Dict
         "maxDrawdown": result.max_drawdown,
         "resultSummary": result.result_summary,
         "nautilusTrader": result.nautilus_provenance,
+        "environment": result.environment,
+        "instrument": result.instrument,
+        "venue": result.venue,
+        "barType": result.bar_type,
+        "costConfiguration": result.cost_configuration,
+        "artifacts": artifacts,
     }
 
 

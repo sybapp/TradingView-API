@@ -281,6 +281,7 @@ class _StrategySpecNautilusAdapter:
                     "quantity": quantity,
                     "reason": reason,
                     "signalBarNs": signal_bar_ns,
+                    "referencePrice": self.bars_by_ns[execution_bar_ns].open,
                 }
                 self.submit_order(order)
                 if side == "buy":
@@ -513,7 +514,9 @@ def _orders_from_fills(
     for client_order_id, row in fills_report.sort_values("ts_last").iterrows():
         submitted = submitted_orders[str(client_order_id)]
         commission = _commission_to_scaled_int(row["commissions"], price_scale)
-        market_price = _price_to_scaled_int(row["avg_px"], price_scale)
+        market_price = _price_to_scaled_int(submitted["referencePrice"], price_scale)
+        execution_price = _price_to_scaled_int(row["avg_px"], price_scale)
+        slippage_cost = abs(execution_price - market_price) * int(submitted["quantity"])
         orders.append(
             StrategyOrder(
                 side=submitted["side"],
@@ -522,9 +525,9 @@ def _orders_from_fills(
                 signal_bar_time=_datetime_from_nanoseconds(int(submitted["signalBarNs"])),
                 execution_bar_time=row["ts_last"].to_pydatetime(),
                 market_price=market_price,
-                execution_price=market_price,
+                execution_price=execution_price,
                 fixed_fee=commission,
-                slippage_cost=0,
+                slippage_cost=slippage_cost,
             )
         )
     return orders

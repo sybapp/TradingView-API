@@ -12,7 +12,6 @@ from .nautilus_evaluator import (
     WalkForwardConfig,
     run_nautilus_validation_backtest,
     run_smoke_backtest,
-    run_strategy_backtest,
     run_walk_forward_backtest,
 )
 
@@ -28,9 +27,6 @@ def main() -> None:
     parser.add_argument("--walk-forward-training-sessions", type=int, help="RTH sessions in each walk-forward training window")
     parser.add_argument("--walk-forward-scoring-sessions", type=int, help="RTH sessions in each walk-forward scoring window")
     parser.add_argument("--walk-forward-step-sessions", type=int, help="RTH sessions to advance between walk-forward windows")
-    parser.add_argument("--walk-forward-training-bars", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--walk-forward-scoring-bars", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--walk-forward-step-bars", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--min-trades", type=int, default=10, help="Minimum trades required to survive fitness checks")
     parser.add_argument("--max-drawdown", type=int, help="Maximum drawdown allowed by fitness checks")
     parser.add_argument("--max-cost-to-gross-ratio", type=float, help="Maximum total cost to absolute gross PnL ratio")
@@ -50,29 +46,14 @@ def main() -> None:
             args.walk_forward_training_sessions is not None
             or args.walk_forward_scoring_sessions is not None
         )
-        uses_legacy_bar_walk_forward = (
-            args.walk_forward_training_bars is not None
-            or args.walk_forward_scoring_bars is not None
-        )
-        if uses_session_walk_forward or uses_legacy_bar_walk_forward:
-            if uses_session_walk_forward and uses_legacy_bar_walk_forward:
-                raise SystemExit("Use session-based or legacy bar-based walk-forward flags, not both")
-            if uses_session_walk_forward:
-                if args.walk_forward_training_sessions is None or args.walk_forward_scoring_sessions is None:
-                    raise SystemExit("--walk-forward-training-sessions and --walk-forward-scoring-sessions must be provided together")
-                walk_forward = WalkForwardConfig(
-                    training_sessions=args.walk_forward_training_sessions,
-                    scoring_sessions=args.walk_forward_scoring_sessions,
-                    step_sessions=args.walk_forward_step_sessions,
-                )
-            else:
-                if args.walk_forward_training_bars is None or args.walk_forward_scoring_bars is None:
-                    raise SystemExit("--walk-forward-training-bars and --walk-forward-scoring-bars must be provided together")
-                walk_forward = WalkForwardConfig(
-                    training_bars=args.walk_forward_training_bars,
-                    scoring_bars=args.walk_forward_scoring_bars,
-                    step_bars=args.walk_forward_step_bars,
-                )
+        if uses_session_walk_forward:
+            if args.walk_forward_training_sessions is None or args.walk_forward_scoring_sessions is None:
+                raise SystemExit("--walk-forward-training-sessions and --walk-forward-scoring-sessions must be provided together")
+            walk_forward = WalkForwardConfig(
+                training_sessions=args.walk_forward_training_sessions,
+                scoring_sessions=args.walk_forward_scoring_sessions,
+                step_sessions=args.walk_forward_step_sessions,
+            )
             result = run_walk_forward_backtest(
                 dataset_path=args.dataset_path,
                 strategy_spec=strategy_spec,

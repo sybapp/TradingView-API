@@ -115,7 +115,12 @@ def run_bounded_strategy_search(
         )
     else:
         generated_candidates = generate_bounded_template_specs(templates, search_config)
-        generated_candidates.extend(dict(candidate) for candidate in (proposed_candidates or []))
+        remaining_budget = search_config.max_candidates - len(generated_candidates)
+        if remaining_budget > 0:
+            generated_candidates.extend(
+                dict(candidate)
+                for candidate in (proposed_candidates or [])[:remaining_budget]
+            )
         evaluated, rejected = _evaluate_candidates(
             dataset_path=dataset_path,
             candidates=generated_candidates,
@@ -164,6 +169,7 @@ def _evaluate_candidates(
     walk_forward: WalkForwardConfig,
     fitness_constraints: FitnessConstraints,
     optimizer_phase: str = "evaluation",
+    candidate_id_offset: int = 0,
 ) -> tuple[List[EvaluatedSearchCandidate], List[JsonObject]]:
     evaluated: List[EvaluatedSearchCandidate] = []
     rejected: List[JsonObject] = []
@@ -173,7 +179,7 @@ def _evaluate_candidates(
         except ValueError as exc:
             rejected.append(
                 {
-                    "candidateId": candidate.get("strategyId", f"candidate-{index}"),
+                    "candidateId": f"candidate-{candidate_id_offset + index}",
                     "source": _candidate_source(candidate),
                     "strategySpec": dict(candidate),
                     "error": str(exc),
@@ -191,7 +197,7 @@ def _evaluate_candidates(
         )
         evaluated.append(
             EvaluatedSearchCandidate(
-                candidate_id=f"candidate-{index}",
+                candidate_id=f"candidate-{candidate_id_offset + index}",
                 strategy_id=spec.strategy_id,
                 strategy_spec=spec.raw,
                 result=result,
@@ -246,6 +252,7 @@ def _run_optuna_style_search(
             walk_forward=walk_forward,
             fitness_constraints=fitness_constraints,
             optimizer_phase="exploitation",
+            candidate_id_offset=len(generated_candidates),
         )
         generated_candidates.extend(exploitation_candidates)
         evaluated.extend(exploitation_evaluated)
@@ -262,6 +269,7 @@ def _run_optuna_style_search(
             walk_forward=walk_forward,
             fitness_constraints=fitness_constraints,
             optimizer_phase="proposed",
+            candidate_id_offset=len(generated_candidates),
         )
         generated_candidates.extend(proposed)
         evaluated.extend(proposed_evaluated)
@@ -329,9 +337,9 @@ def reproduce_search_winner(registry_record_path: Union[str, Path]) -> WalkForwa
         ),
         registry_path=record_path.parent / "reproduced-runs",
         walk_forward=WalkForwardConfig(
-            training_sessions=walk_forward.get("trainingSessions", walk_forward.get("trainingBars")),
-            scoring_sessions=walk_forward.get("scoringSessions", walk_forward.get("scoringBars")),
-            step_sessions=walk_forward.get("stepSessions", walk_forward.get("stepBars")),
+            training_sessions=walk_forward["trainingSessions"],
+            scoring_sessions=walk_forward["scoringSessions"],
+            step_sessions=walk_forward["stepSessions"],
         ),
         fitness_constraints=FitnessConstraints(
             min_trades=constraints["minTrades"],
@@ -464,6 +472,11 @@ def _nautilus_validation_rejection_reasons(candidate: EvaluatedSearchCandidate) 
         provenance = window.get("nautilusTrader")
         if not _has_required_nautilus_provenance(provenance):
             reasons.append(f"missing_required_nautilus_provenance_window_{index}")
+        if not _has_required_nautilus_window_metadata(window):
+            reasons.append(f"missing_required_nautilus_metadata_window_{index}")
+        missing_artifacts = _missing_nautilus_window_artifacts(record_path.parent, window)
+        if missing_artifacts:
+            reasons.append(f"missing_required_nautilus_artifacts_window_{index}")
 
     if any(
         not _has_required_nautilus_provenance(result.nautilus_provenance)
@@ -471,10 +484,20 @@ def _nautilus_validation_rejection_reasons(candidate: EvaluatedSearchCandidate) 
     ):
         reasons.append("missing_required_training_result_nautilus_provenance")
     if any(
+        not _has_required_nautilus_result_metadata(result)
+        for result in candidate.result.training_window_results
+    ):
+        reasons.append("missing_required_training_result_nautilus_metadata")
+    if any(
         not _has_required_nautilus_provenance(result.nautilus_provenance)
         for result in candidate.result.window_results
     ):
         reasons.append("missing_required_scoring_result_nautilus_provenance")
+    if any(
+        not _has_required_nautilus_result_metadata(result)
+        for result in candidate.result.window_results
+    ):
+        reasons.append("missing_required_scoring_result_nautilus_metadata")
     return reasons
 
 
@@ -490,6 +513,40 @@ def _has_required_nautilus_provenance(provenance: Any) -> bool:
         and provenance.get("engine") == "BacktestEngine"
         and provenance.get("runtimeImportFromThirdPartyReference") is False
     )
+
+
+def _has_required_nautilus_window_metadata(window: Any) -> bool:
+    if not isinstance(window, dict):
+        return False
+    return all(
+        isinstance(window.get(key), dict) and bool(window.get(key))
+        for key in ("environment", "instrument", "venue", "barType", "costConfiguration", "artifacts")
+    )
+
+
+def _has_required_nautilus_result_metadata(result: Any) -> bool:
+    return all(
+        bool(getattr(result, field, None))
+        for field in ("environment", "instrument", "venue", "bar_type", "cost_configuration")
+    )
+
+
+def _missing_nautilus_window_artifacts(run_path: Path, window: Any) -> List[str]:
+    artifacts = window.get("artifacts") if isinstance(window, dict) else None
+    if not isinstance(artifacts, dict):
+        return ["artifacts"]
+
+    missing: List[str] = []
+    for key in ("ordersByWindow", "nautilusOrderFills", "nautilusPositions", "nautilusAccount"):
+        artifact = artifacts.get(key)
+        if not isinstance(artifact, str) or not artifact:
+            missing.append(key)
+            continue
+        if not (run_path / artifact).exists():
+            missing.append(key)
+    if not artifacts.get("ordersByWindowKey"):
+        missing.append("ordersByWindowKey")
+    return missing
 
 
 def _write_search_registry_record(
@@ -517,7 +574,7 @@ def _write_search_registry_record(
     search_path = registry_path / "searches" / run_id
     search_path.mkdir(parents=True, exist_ok=True)
     dataset_record = _snapshot_dataset(search_path, dataset_path)
-    winning_run_artifact = (
+    winning_run_artifacts = (
         _copy_winning_run_artifacts(search_path, winning_candidate)
         if winning_candidate
         else None
@@ -541,7 +598,7 @@ def _write_search_registry_record(
         "rejectedCandidates": rejected_candidates,
         "ranking": [candidate.strategy_id for candidate in ranked_survivors],
         "bestRejectedCandidate": _best_rejected_candidate_to_json(best_rejected_candidate),
-        "winningRun": _winning_candidate_to_json(winning_candidate, winning_run_artifact),
+        "winningRun": _winning_candidate_to_json(winning_candidate, winning_run_artifacts),
         "reproducibilityInputs": {
             "datasetSnapshot": dataset_record["artifacts"]["snapshot"],
             "optimizerConfig": _search_config_to_json(search_config),
@@ -556,16 +613,18 @@ def _write_search_registry_record(
     return record_path
 
 
-def _copy_winning_run_artifacts(search_path: Path, candidate: EvaluatedSearchCandidate) -> str:
+def _copy_winning_run_artifacts(search_path: Path, candidate: EvaluatedSearchCandidate) -> JsonObject:
     source = candidate.result.registry_record_path
     artifact_dir = search_path / "winning-run"
     artifact_dir.mkdir(exist_ok=True)
     destination = artifact_dir / "run.json"
     shutil.copyfile(source, destination)
+    artifacts = {"runRecord": "winning-run/run.json"}
     orders_source = source.parent / "orders-by-window.json"
     if orders_source.exists():
         shutil.copyfile(orders_source, artifact_dir / "orders-by-window.json")
-    return "winning-run/run.json"
+        artifacts["ordersByWindow"] = "winning-run/orders-by-window.json"
+    return artifacts
 
 
 def _snapshot_dataset(search_path: Path, dataset_path: Path) -> JsonObject:
@@ -611,7 +670,7 @@ def _rejected_evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate, r
 
 def _winning_candidate_to_json(
     candidate: Optional[EvaluatedSearchCandidate],
-    winning_run_artifact: Optional[str],
+    winning_run_artifacts: Optional[JsonObject],
 ) -> Optional[JsonObject]:
     if candidate is None:
         return None
@@ -625,7 +684,7 @@ def _winning_candidate_to_json(
             "recordType": "Nautilus Walk-Forward Validation",
             "requiredNautilusProvenance": True,
         },
-        "artifacts": {"runRecord": winning_run_artifact},
+        "artifacts": winning_run_artifacts or {},
     }
 
 
@@ -722,16 +781,12 @@ def _cost_model_to_json(cost_model: CostModel) -> JsonObject:
 
 
 def _walk_forward_config_to_json(config: WalkForwardConfig) -> JsonObject:
-    training_sessions = config.training_sessions if config.training_sessions is not None else config.training_bars
-    scoring_sessions = config.scoring_sessions if config.scoring_sessions is not None else config.scoring_bars
-    step_sessions = (
-        config.step_sessions
-        if config.step_sessions is not None
-        else config.step_bars if config.step_bars is not None else scoring_sessions
-    )
+    if config.training_sessions is None or config.scoring_sessions is None:
+        raise ValueError("walk_forward requires training_sessions and scoring_sessions")
+    step_sessions = config.step_sessions if config.step_sessions is not None else config.scoring_sessions
     return {
-        "trainingSessions": training_sessions,
-        "scoringSessions": scoring_sessions,
+        "trainingSessions": config.training_sessions,
+        "scoringSessions": config.scoring_sessions,
         "stepSessions": step_sessions,
     }
 

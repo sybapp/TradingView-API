@@ -19,7 +19,7 @@ HAND_WRITTEN_SPEC = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
 
 
 class StrategyEvaluatorTests(unittest.TestCase):
-    def test_runs_hand_written_strategy_spec_end_to_end_and_records_run(self):
+    def test_runs_hand_written_strategy_spec_through_non_authoritative_replay(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             registry_path = Path(temp_dir) / "run-registry"
 
@@ -43,15 +43,8 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertEqual(result.total_costs, 550)
             self.assertEqual(result.net_pnl, 475)
 
-            registry_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
-            self.assertEqual(registry_record["recordType"], "Evaluator Replay Helper")
-            self.assertFalse(registry_record["authoritative"])
-            self.assertEqual(registry_record["dataset"]["datasetId"], "es-rth-5m-fixture")
-            self.assertEqual(registry_record["dataset"]["collectedAt"], "2026-06-28T12:00:00.000Z")
-            self.assertEqual(registry_record["strategySpec"], HAND_WRITTEN_SPEC)
-            self.assertEqual(registry_record["costModel"]["fixedFee"], 2.5)
-            self.assertEqual(registry_record["evaluatorVersion"], "strategy-replay-v1")
-            self.assertEqual(registry_record["artifacts"]["orders"], "orders.json")
+            self.assertEqual(result.registry_record_path, Path())
+            self.assertFalse(any(registry_path.rglob("run.json")))
 
     def test_strategy_spec_validation_rejects_missing_intraday_flat_control(self):
         invalid_spec = {
@@ -161,6 +154,17 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertEqual(registry_record["perWindowResults"][0]["tradeCount"], 1)
             self.assertEqual(registry_record["perWindowResults"][0]["resultSummary"]["engine"], "nautilus-trader-backtest-engine")
             self.assertEqual(registry_record["perWindowResults"][0]["nautilusTrader"]["engine"], "BacktestEngine")
+            scoring_window = registry_record["perWindowResults"][0]
+            self.assertEqual(scoring_window["instrument"]["instrumentId"], "ESU6.GLBX")
+            self.assertEqual(scoring_window["venue"]["name"], "GLBX")
+            self.assertEqual(scoring_window["barType"]["value"], "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL")
+            self.assertEqual(
+                scoring_window["costConfiguration"]["nautilusExecution"]["feeModel"]["class"],
+                "PerContractFeeModel",
+            )
+            self.assertIn("pythonVersion", scoring_window["environment"])
+            for artifact_key in ("ordersByWindow", "nautilusOrderFills", "nautilusPositions", "nautilusAccount"):
+                self.assertTrue((result.registry_record_path.parent / scoring_window["artifacts"][artifact_key]).exists())
             self.assertEqual(registry_record["fitness"]["survivalChecks"]["minTrades"]["passed"], False)
             self.assertEqual(registry_record["fitness"]["rejectionReasons"], ["min_trades"])
             self.assertGreater(registry_record["fitness"]["rankingInputs"]["outOfSampleSharpe"], 0)
