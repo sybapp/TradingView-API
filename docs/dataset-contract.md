@@ -82,8 +82,13 @@ The first TradingView Collector path is exported as `TradingView.collector`:
 
 - `collectEsRth5mDataset(options)`
 - `buildEsRth5mDataset(options)`
+- `collectIndicatorStudies(options)`
+- `indicatorStudiesToFeatures(options)`
 - `periodsToRthBars(periods, options)`
 - `writeVersionedDatasetSync(datasetPath, dataset)`
+- `CURATED_INDICATOR_ALLOWLIST`
+
+`collectEsRth5mDataset(options)` collects the default curated indicator allowlist unless `includeIndicatorFeatures` is set to `false` or `indicatorStudies` are supplied directly. `buildEsRth5mDataset(options)` accepts optional `indicatorStudies` and `indicatorAllowlist` values. Allowlisted study periods are exported as plot features, and allowlisted study graphics are exported as typed Structural Features. Repainting-risk indicators use delayed availability times before the resulting records may be consumed as confirmed candidate signals.
 
 To write an ES RTH 5-minute continuous futures dataset:
 
