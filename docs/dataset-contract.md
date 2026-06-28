@@ -17,6 +17,8 @@ It exposes:
 - `to_nautilus_bar_inputs(dataset)`
 - `to_nautilus_bars(dataset)` when `nautilus_trader` is installed
 - `run_smoke_backtest(dataset_path)`
+- `validate_strategy_spec(strategy_spec)`
+- `run_strategy_backtest(dataset_path, strategy_spec, cost_model, registry_path)`
 
 The smoke path can be run against the fixture dataset without calling
 TradingView:
@@ -24,6 +26,21 @@ TradingView:
 ```sh
 python3 -m evaluator tests/fixtures/es-rth-5m-dataset
 ```
+
+The first hand-written Strategy Spec fixture can be replayed through the
+Nautilus-compatible evaluator and recorded in a local run registry:
+
+```sh
+python3 -m evaluator tests/fixtures/es-rth-5m-dataset \
+  --strategy-spec tests/fixtures/strategy-specs/supertrend-long.json \
+  --run-registry runs
+```
+
+This strategy replay validates the spec, maps it onto the evaluator's
+Nautilus-compatible bar replay strategy, evaluates entry signals after bar
+close, executes orders on the next bar, applies fixed fees and slippage, forces
+the strategy flat before RTH close, and writes a reproducible `run.json` plus
+`orders.json` artifact.
 
 ## Manifest
 

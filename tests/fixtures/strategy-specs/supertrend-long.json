@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "strategyId": "fixture-supertrend-long",
+  "description": "Enter long when confirmed Supertrend direction is positive.",
+  "parameters": {
+    "direction_feature": "direction"
+  },
+  "entryRules": [
+    {
+      "type": "feature_equals",
+      "feature": {
+        "indicatorId": "STD;Supertrend",
+        "name": "direction"
+      },
+      "value": 1,
+      "side": "long"
+    }
+  ],
+  "exits": {
+    "maxBarsInTrade": 100
+  },
+  "sizing": {
+    "type": "fixed",
+    "quantity": 1
+  },
+  "riskControls": {
+    "intradayFlat": true,
+    "flatBeforeCloseMinutes": 5,
+    "stopLossTicks": 12,
+    "takeProfitTicks": 20
+  },
+  "tunableParameters": {
+    "stopLossTicks": {
+      "min": 8,
+      "max": 20,
+      "step": 4
+    },
+    "takeProfitTicks": {
+      "min": 12,
+      "max": 32,
+      "step": 4
+    }
+  }
+}
