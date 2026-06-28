@@ -13,12 +13,16 @@ A rule, feature, or event inferred from TradingView indicator values or graphics
 _Avoid_: Final strategy, proven edge
 
 **Nautilus Validation**:
-The final evaluation of a candidate strategy inside NautilusTrader using independently replayed market data, execution assumptions, costs, and performance metrics.
-_Avoid_: TradingView validation, chart validation
+The final evaluation of a candidate strategy inside NautilusTrader using independently replayed market data, execution assumptions, costs, and performance metrics. A replay helper that does not execute inside NautilusTrader is not Nautilus Validation.
+_Avoid_: TradingView validation, chart validation, Nautilus-compatible replay
 
 **Bar-Level Loop**:
 The first strategy evolution loop, where TradingView OHLCV bars and indicator-derived data are converted into NautilusTrader bar and custom data for validation.
 _Avoid_: Tick-accurate loop, live execution simulation
+
+**Evaluator Smoke Replay**:
+A lightweight replay helper used to test dataset loading, feature availability, and Strategy Spec plumbing without invoking NautilusTrader. It may support unit tests, but it is not a source of final fitness, ranking, or Run Registry truth.
+_Avoid_: Nautilus Validation, final backtest, production backtest
 
 **Structural Feature**:
 A typed, time-aligned feature derived from TradingView indicator plots or graphics, such as a label event, trend line, price zone, or volume profile bin.
