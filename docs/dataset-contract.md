@@ -27,14 +27,14 @@ The smoke path can be run against the fixture dataset without calling
 TradingView:
 
 ```sh
-python3 -m evaluator tests/fixtures/es-rth-5m-dataset
+uv run python -m evaluator tests/fixtures/es-rth-5m-dataset
 ```
 
 The first hand-written Strategy Spec fixture can be replayed through the
 Nautilus-compatible evaluator and recorded in a local run registry:
 
 ```sh
-python3 -m evaluator tests/fixtures/es-rth-5m-dataset \
+uv run python -m evaluator tests/fixtures/es-rth-5m-dataset \
   --strategy-spec tests/fixtures/strategy-specs/supertrend-long.json \
   --run-registry runs
 ```
@@ -44,6 +44,10 @@ Nautilus-compatible bar replay strategy, evaluates entry signals after bar
 close, executes orders on the next bar, applies fixed fees and slippage, forces
 the strategy flat before RTH close, and writes a reproducible `run.json` plus
 `orders.json` artifact.
+
+The evaluator is a root-level `uv` project. Use `uv run ...` commands from the
+repository root so imports resolve from the locked Python 3.12 environment;
+system `python3` is not a supported evaluator runtime.
 
 The first bounded Strategy Spec search loop lives in the same Python package.
 It generates schema-valid specs from constrained `StrategyTemplate` choices,
@@ -64,7 +68,7 @@ specs and are validated before they can be evaluated or ranked.
 - `collectedAt`: ISO timestamp
 - `source`: `tradingview`
 - `symbol`: ticker, root, and asset class
-- `session`: session name, timezone, start, and end
+- `session`: session name, timezone, start, end, optional flat-before-close offset, and optional per-session instances
 - `bar`: interval, price scale, and volume unit
 - `contract`: continuous futures metadata and roll policy metadata
 - `indicators`: curated indicator allowlist entries
@@ -80,7 +84,15 @@ specs and are validated before they can be evaluated or ranked.
 - `close`
 - `volume`
 
-Bars must align to the interval declared in the manifest. The first supported intervals are `5m` and `15m`.
+Bars must align to the interval declared in the manifest. The first supported intervals are `5m` and `15m`. RTH datasets may contain overnight or weekend gaps between distinct sessions, but bars must remain continuous at the declared interval inside each session.
+
+When present, `manifest.session.sessions` records the derived RTH session structure:
+
+- `id`: local session date in the declared timezone
+- `firstBarTime`
+- `lastBarTime`
+- `flatBeforeCloseTime`
+- `barCount`
 
 ## Features
 
@@ -141,7 +153,7 @@ To write an ES RTH 5-minute continuous futures dataset:
 npm run collect:es-rth-5m -- --output=datasets/es-rth-5m-latest
 ```
 
-The command collects `CME_MINI:ES1!` 5-minute bars with TradingView's regular session, records the dataset as continuous futures with TradingView roll metadata, filters bars to the explicit `America/New_York` RTH window, writes the three contract files, and validates the dataset before exiting.
+The command collects `CME_MINI:ES1!` 5-minute bars with TradingView's regular session, records the dataset as continuous futures with TradingView roll metadata, filters bars to the explicit `America/New_York` RTH window, preserves multiple RTH sessions when present, writes the three contract files, and validates the dataset before exiting.
 
 For a reproducible demo, pin the TradingView reference timestamp and manifest collection timestamp:
 

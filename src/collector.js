@@ -14,6 +14,7 @@ const ES_RTH_5M_DEFAULTS = {
   timezone: 'America/New_York',
   sessionStart: '09:30',
   sessionEnd: '16:00',
+  flatBeforeCloseMinutes: 5,
   volumeUnit: 'contracts',
   range: 78,
   minBars: 1,
@@ -71,10 +72,84 @@ function zonedClockMinutes(isoTimestamp, timezone) {
   return (normalizedHour * 60) + minute;
 }
 
+function zonedDate(isoTimestamp, timezone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(isoTimestamp));
+
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function isInsideSession(isoTimestamp, session) {
   const value = zonedClockMinutes(isoTimestamp, session.timezone);
   return value >= minutesFromClock(session.start)
     && value < minutesFromClock(session.end);
+}
+
+function zonedOffsetMs(date, timezone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date);
+
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  const hour = Number(part('hour'));
+  const normalizedHour = hour === 24 ? 0 : hour;
+  const zonedAsUtc = Date.UTC(
+    Number(part('year')),
+    Number(part('month')) - 1,
+    Number(part('day')),
+    normalizedHour,
+    Number(part('minute')),
+    Number(part('second')),
+  );
+
+  return zonedAsUtc - date.getTime();
+}
+
+function zonedDateTimeToUtc(dateValue, clockValue, timezone) {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const [hour, minute] = clockValue.split(':').map(Number);
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const offset = zonedOffsetMs(guess, timezone);
+
+  return new Date(guess.getTime() - offset);
+}
+
+function sessionFlatBeforeCloseTime(sessionId, session) {
+  const end = zonedDateTimeToUtc(sessionId, session.end, session.timezone);
+  const flatBeforeCloseMinutes = session.flatBeforeCloseMinutes
+    ?? ES_RTH_5M_DEFAULTS.flatBeforeCloseMinutes;
+
+  return new Date(end.getTime() - (flatBeforeCloseMinutes * 60 * 1000)).toISOString();
+}
+
+function deriveRthSessions(bars, session) {
+  const bySession = new Map();
+
+  bars.forEach((bar) => {
+    const sessionId = zonedDate(bar.time, session.timezone);
+    if (!bySession.has(sessionId)) bySession.set(sessionId, []);
+    bySession.get(sessionId).push(bar);
+  });
+
+  return Array.from(bySession.entries()).map(([id, sessionBars]) => ({
+    id,
+    firstBarTime: sessionBars[0].time,
+    lastBarTime: sessionBars[sessionBars.length - 1].time,
+    flatBeforeCloseTime: sessionFlatBeforeCloseTime(id, session),
+    barCount: sessionBars.length,
+  }));
 }
 
 function toContractBar(period) {
@@ -450,35 +525,6 @@ async function collectIndicatorStudies({
   }));
 }
 
-function newestContiguousRun(bars, intervalMs, minBars) {
-  const runs = [];
-  let current = [];
-
-  bars.forEach((bar) => {
-    if (current.length === 0) {
-      current.push(bar);
-      return;
-    }
-
-    const previous = current[current.length - 1];
-    const gap = Date.parse(bar.time) - Date.parse(previous.time);
-    if (gap === intervalMs) {
-      current.push(bar);
-      return;
-    }
-
-    runs.push(current);
-    current = [bar];
-  });
-
-  if (current.length > 0) runs.push(current);
-
-  const eligible = runs.filter((run) => run.length >= minBars);
-  if (eligible.length === 0) return [];
-
-  return eligible[eligible.length - 1];
-}
-
 function periodsToRthBars(periods, options = {}) {
   const session = {
     timezone: options.timezone || ES_RTH_5M_DEFAULTS.timezone,
@@ -491,11 +537,8 @@ function periodsToRthBars(periods, options = {}) {
     .filter((bar) => isInsideSession(bar.time, session))
     .sort((left, right) => Date.parse(left.time) - Date.parse(right.time));
 
-  return newestContiguousRun(
-    bars,
-    5 * 60 * 1000,
-    options.minBars || ES_RTH_5M_DEFAULTS.minBars,
-  );
+  if (bars.length < (options.minBars || ES_RTH_5M_DEFAULTS.minBars)) return [];
+  return bars;
 }
 
 function buildEsRth5mDataset({
@@ -507,6 +550,13 @@ function buildEsRth5mDataset({
   indicatorStudies = [],
 } = {}) {
   const collectedAt = now instanceof Date ? now : new Date(now);
+  const session = {
+    name: ES_RTH_5M_DEFAULTS.sessionName,
+    timezone: ES_RTH_5M_DEFAULTS.timezone,
+    start: ES_RTH_5M_DEFAULTS.sessionStart,
+    end: ES_RTH_5M_DEFAULTS.sessionEnd,
+    flatBeforeCloseMinutes: ES_RTH_5M_DEFAULTS.flatBeforeCloseMinutes,
+  };
 
   return {
     manifest: {
@@ -520,10 +570,8 @@ function buildEsRth5mDataset({
         assetClass: ES_RTH_5M_DEFAULTS.assetClass,
       },
       session: {
-        name: ES_RTH_5M_DEFAULTS.sessionName,
-        timezone: ES_RTH_5M_DEFAULTS.timezone,
-        start: ES_RTH_5M_DEFAULTS.sessionStart,
-        end: ES_RTH_5M_DEFAULTS.sessionEnd,
+        ...session,
+        sessions: deriveRthSessions(bars, session),
       },
       bar: {
         interval: ES_RTH_5M_DEFAULTS.interval,

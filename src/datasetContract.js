@@ -80,6 +80,14 @@ function validateManifest(manifest, errors) {
     requireString(errors, manifest.session.timezone, 'manifest.session.timezone');
     requireString(errors, manifest.session.start, 'manifest.session.start');
     requireString(errors, manifest.session.end, 'manifest.session.end');
+    if (manifest.session.flatBeforeCloseMinutes !== undefined) {
+      requireNumber(
+        errors,
+        manifest.session.flatBeforeCloseMinutes,
+        'manifest.session.flatBeforeCloseMinutes',
+      );
+    }
+    validateSessionInstances(manifest.session, errors);
   }
 
   if (requireObject(errors, manifest.bar, 'manifest.bar')) {
@@ -127,7 +135,80 @@ function intervalToMs(interval) {
   return null;
 }
 
-function validateBars(bars, errors, interval) {
+function minutesFromClock(value) {
+  const [hours, minutes] = value.split(':').map(Number);
+  return (hours * 60) + minutes;
+}
+
+function zonedParts(isoTimestamp, timezone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(new Date(isoTimestamp));
+
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  const hour = Number(part('hour'));
+  const normalizedHour = hour === 24 ? 0 : hour;
+
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    minutes: (normalizedHour * 60) + Number(part('minute')),
+  };
+}
+
+function barSessionId(bar, session) {
+  if (
+    !session
+    || typeof session.timezone !== 'string'
+    || typeof session.start !== 'string'
+    || typeof session.end !== 'string'
+    || !isIsoTimestamp(bar?.time)
+  ) {
+    return null;
+  }
+
+  const parts = zonedParts(bar.time, session.timezone);
+  const start = minutesFromClock(session.start);
+  const end = minutesFromClock(session.end);
+
+  if (parts.minutes < start || parts.minutes >= end) return null;
+  return parts.date;
+}
+
+function validateSessionInstances(session, errors) {
+  if (session.sessions === undefined) return;
+
+  if (!Array.isArray(session.sessions)) {
+    addError(errors, 'manifest.session.sessions', 'must be an array');
+    return;
+  }
+
+  session.sessions.forEach((entry, index) => {
+    const pathName = `manifest.session.sessions[${index}]`;
+    if (!requireObject(errors, entry, pathName)) return;
+
+    requireString(errors, entry.id, `${pathName}.id`);
+    requireTimestamp(errors, entry.firstBarTime, `${pathName}.firstBarTime`);
+    requireTimestamp(errors, entry.lastBarTime, `${pathName}.lastBarTime`);
+    requireTimestamp(errors, entry.flatBeforeCloseTime, `${pathName}.flatBeforeCloseTime`);
+    requireNumber(errors, entry.barCount, `${pathName}.barCount`);
+
+    if (
+      isIsoTimestamp(entry.firstBarTime)
+      && isIsoTimestamp(entry.lastBarTime)
+      && Date.parse(entry.lastBarTime) < Date.parse(entry.firstBarTime)
+    ) {
+      addError(errors, `${pathName}.lastBarTime`, 'must be on or after firstBarTime');
+    }
+  });
+}
+
+function validateBars(bars, errors, interval, session) {
   if (!Array.isArray(bars)) {
     addError(errors, 'bars', 'must be an array');
     return;
@@ -141,6 +222,16 @@ function validateBars(bars, errors, interval) {
     ['open', 'high', 'low', 'close', 'volume'].forEach((field) => {
       requireNumber(errors, bar[field], `${pathName}.${field}`);
     });
+
+    if (
+      session?.timezone
+      && session?.start
+      && session?.end
+      && isIsoTimestamp(bar.time)
+      && !barSessionId(bar, session)
+    ) {
+      addError(errors, `${pathName}.time`, 'must be inside the declared RTH session');
+    }
   });
 
   const expectedGap = intervalToMs(interval);
@@ -152,6 +243,14 @@ function validateBars(bars, errors, interval) {
     if (!isIsoTimestamp(previous?.time) || !isIsoTimestamp(current?.time)) continue;
 
     const actualGap = Date.parse(current.time) - Date.parse(previous.time);
+    const previousSessionId = barSessionId(previous, session);
+    const currentSessionId = barSessionId(current, session);
+    const isSessionBoundary = previousSessionId
+      && currentSessionId
+      && previousSessionId !== currentSessionId;
+
+    if (isSessionBoundary && actualGap > expectedGap) continue;
+
     if (actualGap !== expectedGap) {
       addError(
         errors,
@@ -213,7 +312,7 @@ function validateDataset(dataset) {
   }
 
   validateManifest(dataset.manifest, errors);
-  validateBars(dataset.bars, errors, dataset.manifest?.bar?.interval);
+  validateBars(dataset.bars, errors, dataset.manifest?.bar?.interval, dataset.manifest?.session);
   validateFeatures(dataset.features, errors);
 
   return {

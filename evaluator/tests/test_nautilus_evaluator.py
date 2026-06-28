@@ -24,7 +24,7 @@ class NautilusEvaluatorTests(unittest.TestCase):
         self.assertEqual(dataset.dataset_id, "es-rth-5m-fixture")
         self.assertEqual(dataset.ticker, "CME_MINI:ES1!")
         self.assertEqual(dataset.interval, "5m")
-        self.assertEqual(len(dataset.bars), 78)
+        self.assertEqual(len(dataset.bars), 81)
         self.assertEqual(len(dataset.features), 2)
         self.assertEqual(dataset.features[1].name, "pivot_high_confirmed")
         self.assertEqual(dataset.features[1].value, {"price": 5502.5, "text": "PH"})
@@ -34,9 +34,9 @@ class NautilusEvaluatorTests(unittest.TestCase):
 
         bars = to_nautilus_bar_inputs(dataset)
 
-        self.assertEqual(len(bars), 78)
+        self.assertEqual(len(bars), 81)
         self.assertEqual(bars[0].instrument_id, "CME_MINI:ES1!")
-        self.assertEqual(bars[0].bar_type, "CME_MINI:ES1!-5m-LAST-EXTERNAL")
+        self.assertEqual(bars[0].bar_type, "ES1!.CME_MINI-5-MINUTE-LAST-EXTERNAL")
         self.assertEqual(bars[0].ts_event, 1782394200000000000)
         self.assertEqual(bars[0].open, 550025)
         self.assertEqual(bars[0].high, 550250)
@@ -48,16 +48,18 @@ class NautilusEvaluatorTests(unittest.TestCase):
         result = run_smoke_backtest(FIXTURE_PATH)
 
         self.assertEqual(result.dataset_id, "es-rth-5m-fixture")
-        self.assertEqual(len(result.replayed_bars), 78)
+        self.assertEqual(len(result.replayed_bars), 81)
         self.assertEqual([feature.id for feature in result.available_features], ["feature-1", "feature-2"])
-        self.assertEqual(result.final_close, 551200)
+        self.assertEqual(result.final_close, 551725)
         self.assertEqual(result.engine, "nautilus-compatible-replay")
 
-    def test_real_nautilus_bar_conversion_reports_missing_dependency(self):
+    def test_real_nautilus_bar_conversion_builds_nautilus_bars(self):
         dataset = load_versioned_dataset(FIXTURE_PATH)
 
-        with self.assertRaisesRegex(RuntimeError, "nautilus_trader is required"):
-            to_nautilus_bars(dataset)
+        bars = to_nautilus_bars(dataset)
+
+        self.assertEqual(len(bars), 81)
+        self.assertEqual(str(bars[0].bar_type), "ES1!.CME_MINI-5-MINUTE-LAST-EXTERNAL")
 
 
 if __name__ == "__main__":

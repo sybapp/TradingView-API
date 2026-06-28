@@ -75,7 +75,7 @@ def to_nautilus_bar_input(
     ts_event = timestamp_to_nanoseconds(bar.time)
     return NautilusBarInput(
         instrument_id=instrument_id,
-        bar_type=f"{instrument_id}-{interval}-LAST-EXTERNAL",
+        bar_type=f"{_nautilus_instrument_id(instrument_id)}-{_nautilus_bar_step(interval)}-LAST-EXTERNAL",
         ts_event=ts_event,
         ts_init=ts_event,
         open=_scaled_price(bar.open, price_scale),
@@ -84,6 +84,21 @@ def to_nautilus_bar_input(
         close=_scaled_price(bar.close, price_scale),
         volume=bar.volume,
     )
+
+
+def _nautilus_instrument_id(value: str) -> str:
+    if ":" not in value:
+        return value
+    venue, symbol = value.split(":", 1)
+    return f"{symbol}.{venue}"
+
+
+def _nautilus_bar_step(interval: str) -> str:
+    if interval.endswith("m") and interval[:-1].isdigit():
+        return f"{interval[:-1]}-MINUTE"
+    if interval.endswith("h") and interval[:-1].isdigit():
+        return f"{interval[:-1]}-HOUR"
+    return interval
 
 
 def replay_bar_inputs(bars: Iterable[NautilusBarInput]) -> List[NautilusBarInput]:

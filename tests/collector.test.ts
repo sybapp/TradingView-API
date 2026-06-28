@@ -412,6 +412,22 @@ describe('TradingView collector', () => {
         close: 5502.25,
         volume: 980,
       },
+      {
+        time: Date.parse('2026-06-26T13:30:00.000Z') / 1000,
+        open: 5514.25,
+        max: 5516,
+        min: 5513.75,
+        close: 5515.5,
+        volume: 1180,
+      },
+      {
+        time: Date.parse('2026-06-26T13:35:00.000Z') / 1000,
+        open: 5515.5,
+        max: 5517,
+        min: 5514.5,
+        close: 5516.25,
+        volume: 1020,
+      },
     ]);
 
     const result = await TradingView.collector.collectEsRth5mDataset({
@@ -438,6 +454,23 @@ describe('TradingView collector', () => {
         timezone: 'America/New_York',
         start: '09:30',
         end: '16:00',
+        flatBeforeCloseMinutes: 5,
+        sessions: [
+          {
+            id: '2026-06-25',
+            firstBarTime: '2026-06-25T13:30:00.000Z',
+            lastBarTime: '2026-06-25T13:35:00.000Z',
+            flatBeforeCloseTime: '2026-06-25T19:55:00.000Z',
+            barCount: 2,
+          },
+          {
+            id: '2026-06-26',
+            firstBarTime: '2026-06-26T13:30:00.000Z',
+            lastBarTime: '2026-06-26T13:35:00.000Z',
+            flatBeforeCloseTime: '2026-06-26T19:55:00.000Z',
+            barCount: 2,
+          },
+        ],
       },
       bar: {
         interval: '5m',
@@ -465,6 +498,22 @@ describe('TradingView collector', () => {
         low: 5500.5,
         close: 5502.25,
         volume: 980,
+      },
+      {
+        time: '2026-06-26T13:30:00.000Z',
+        open: 5514.25,
+        high: 5516,
+        low: 5513.75,
+        close: 5515.5,
+        volume: 1180,
+      },
+      {
+        time: '2026-06-26T13:35:00.000Z',
+        open: 5515.5,
+        high: 5517,
+        low: 5514.5,
+        close: 5516.25,
+        volume: 1020,
       },
     ]);
 
