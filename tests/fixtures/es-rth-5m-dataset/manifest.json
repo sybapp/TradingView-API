@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "es-rth-5m-fixture",
+  "collectedAt": "2026-06-28T12:00:00.000Z",
+  "source": "tradingview",
+  "symbol": {
+    "ticker": "CME_MINI:ES1!",
+    "root": "ES",
+    "assetClass": "equity_index_futures"
+  },
+  "session": {
+    "name": "RTH",
+    "timezone": "America/New_York",
+    "start": "09:30",
+    "end": "16:00"
+  },
+  "bar": {
+    "interval": "5m",
+    "priceScale": 100,
+    "volumeUnit": "contracts"
+  },
+  "contract": {
+    "type": "continuous_futures",
+    "continuous": true,
+    "rollPolicy": {
+      "source": "tradingview",
+      "description": "Fixture uses TradingView continuous futures metadata only."
+    }
+  },
+  "indicators": [
+    {
+      "id": "STD;Supertrend",
+      "name": "Supertrend",
+      "version": "tradingview",
+      "repaintingRisk": "confirmed"
+    },
+    {
+      "id": "STD;Zig_Zag",
+      "name": "Zig Zag",
+      "version": "tradingview",
+      "repaintingRisk": "repainting-risk"
+    }
+  ]
+}
