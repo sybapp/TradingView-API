@@ -236,6 +236,131 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertEqual(result.orders[-1].signal_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
             self.assertEqual(result.orders[-1].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
 
+    def test_strategy_replay_requires_all_entry_signal_rules(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "structure-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                    _typed_feature(
+                        "zone-entry",
+                        "2026-06-25T13:35:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_liquidity_zone_touch_entry",
+                        value=True,
+                    ),
+                ],
+                prices=[100, 100, 104, 104],
+                session_dates=["2026-06-25"],
+                session_end="13:50",
+            )
+            conjunctive_entry_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-conjunctive-signal-entry",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                ],
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=conjunctive_entry_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
+            self.assertEqual(result.orders[0].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
+
+    def test_strategy_replay_honors_cooldown_bars_after_exit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "signal-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    )
+                ],
+                prices=[100, 100, 100, 100, 100, 100, 100, 100],
+                session_dates=["2026-06-25"],
+                session_end="14:15",
+            )
+            cooldown_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-cooldown-long",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {"maxBarsInTrade": 1},
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                    "cooldownBarsAfterExit": 2,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=cooldown_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual(
+                [order.signal_bar_time.isoformat() for order in result.orders if order.side == "buy"],
+                [
+                    "2026-06-25T13:30:00+00:00",
+                    "2026-06-25T13:55:00+00:00",
+                ],
+            )
+
     def test_strategy_replay_prioritizes_stop_loss_over_reverse_signal(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             dataset_path = _write_walk_forward_dataset(

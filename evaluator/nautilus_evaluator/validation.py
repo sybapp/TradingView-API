@@ -202,6 +202,8 @@ class _StrategySpecNautilusAdapter:
                 self.submitted_orders: Dict[str, Dict[str, Any]] = {}
                 self.open_position: Optional[_OpenPosition] = None
                 self.entry_taken = False
+                self.allow_reentry = "cooldownBarsAfterExit" in spec.raw.get("riskControls", {})
+                self.last_exit_bar_index: Optional[int] = None
                 self.bars_by_ns = {timestamp_to_nanoseconds(item.time): item for item in dataset.bars}
                 self.bar_indices_by_ns = {
                     timestamp_to_nanoseconds(item.time): index for index, item in enumerate(dataset.bars)
@@ -255,19 +257,21 @@ class _StrategySpecNautilusAdapter:
                 if self.pending_signal is not None or self.open_position is not None or self.entry_taken:
                     return
 
+                if not self._cooldown_complete(bar.ts_event):
+                    return
+
                 if not self._next_bar_can_execute_before_flat(bar.ts_event):
                     return
 
                 session = self._session_for_bar(bar.ts_event)
                 if session is None:
                     return
-                matched_rule = _matching_entry_rule(
+                if _all_entry_rules_match(
                     self.spec.entry_rules,
                     self.dataset.features,
                     bar.ts_event,
                     earliest_feature_ns=session.first_bar_ns,
-                )
-                if matched_rule is not None:
+                ):
                     self.pending_signal = _PendingSignal(
                         side="buy",
                         quantity=self.spec.sizing.quantity,
@@ -320,6 +324,9 @@ class _StrategySpecNautilusAdapter:
                     )
                 else:
                     self.open_position = None
+                    if self.allow_reentry:
+                        self.entry_taken = False
+                    self.last_exit_bar_index = self.bar_indices_by_ns[execution_bar_ns]
 
             def _next_bar_can_execute_before_flat(self, current_bar_ns: int) -> bool:
                 next_bar = self._next_dataset_bar(current_bar_ns)
@@ -332,6 +339,15 @@ class _StrategySpecNautilusAdapter:
                     and next_session is not None
                     and current_session.session_id == next_session.session_id
                     and timestamp_to_nanoseconds(next_bar.time) < current_session.flat_at_ns
+                )
+
+            def _cooldown_complete(self, current_bar_ns: int) -> bool:
+                if self.last_exit_bar_index is None:
+                    return True
+                current_index = self.bar_indices_by_ns[current_bar_ns]
+                return (
+                    current_index - self.last_exit_bar_index
+                    > self.spec.risk_controls.cooldown_bars_after_exit
                 )
 
             def _exit_reason(self, bar) -> Optional[str]:
@@ -350,7 +366,7 @@ class _StrategySpecNautilusAdapter:
                 if dataset_bar.low <= stop_price:
                     return "stop-loss"
 
-                matched_exit_rule = _matching_entry_rule(
+                matched_exit_rule = _matching_feature_rule(
                     self.spec.exits.reverse_signal_rules,
                     self.dataset.features,
                     bar.ts_event,
@@ -455,13 +471,49 @@ def _nautilus_fill_model(cost_model: CostModel, nautilus: Mapping[str, Any]) -> 
     return nautilus["OneTickSlippageFillModel"]()
 
 
-def _matching_entry_rule(
+def _all_entry_rules_match(
+    rules: List[FeatureEqualsEntryRule],
+    features: List[FeatureRecord],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
+    return bool(rules) and all(
+        _feature_rule_matches(
+            rule,
+            features,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        )
+        for rule in rules
+    )
+
+
+def _matching_feature_rule(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
     bar_time_ns: int,
     *,
     earliest_feature_ns: Optional[int] = None,
 ) -> Optional[FeatureEqualsEntryRule]:
+    for rule in rules:
+        if _feature_rule_matches(
+            rule,
+            features,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        ):
+            return rule
+    return None
+
+
+def _feature_rule_matches(
+    rule: FeatureEqualsEntryRule,
+    features: List[FeatureRecord],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
     available_features = [
         feature
         for feature in features
@@ -471,16 +523,13 @@ def _matching_entry_rule(
             or timestamp_to_nanoseconds(feature.availability_time) >= earliest_feature_ns
         )
     ]
-    for rule in rules:
-        if any(
-            feature.indicator_id == rule.indicator_id
-            and (rule.feature_type is None or feature.type == rule.feature_type)
-            and feature.name == rule.name
-            and feature.value == rule.value
-            for feature in available_features
-        ):
-            return rule
-    return None
+    return any(
+        feature.indicator_id == rule.indicator_id
+        and (rule.feature_type is None or feature.type == rule.feature_type)
+        and feature.name == rule.name
+        and feature.value == rule.value
+        for feature in available_features
+    )
 
 
 def _session_windows(dataset: VersionedDataset, flat_before_close_minutes: int) -> List[_SessionWindow]:

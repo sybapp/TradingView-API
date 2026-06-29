@@ -21,6 +21,7 @@ It exposes:
 - `run_smoke_backtest(dataset_path)`
 - `validate_strategy_spec(strategy_spec)`
 - `run_strategy_backtest(dataset_path, strategy_spec, cost_model, registry_path)`
+- `create_luxalgo_ict_smc_long_strategy_template(config=None)`
 - `generate_bounded_template_specs(templates, search_config)`
 - `run_bounded_strategy_search(dataset_path, templates, cost_model, registry_path, walk_forward, fitness_constraints, search_config, proposed_candidates=None)`
 - `reproduce_search_winner(search_registry_record_path)`
@@ -65,6 +66,14 @@ Nautilus Validation survivor exists. If no candidate survives, the search
 completes with no winner and may report only a diagnostic best rejected
 candidate. LLM-proposed candidates are accepted only as candidate specs and are
 validated before they can be evaluated or ranked.
+
+`create_luxalgo_ict_smc_long_strategy_template()` creates a bounded LuxAlgo
+ICT/SMC long template for datasets that contain derived `type: "signal"`
+features. Generated specs require a bullish structure-event signal and a
+bullish liquidity-zone confirmation signal for entry, use reverse bearish
+structure-event signals for exits, vary the LuxAlgo derivation/search
+parameters, and report each candidate's total trade count against the 30-trade
+comparison threshold in search registry artifacts.
 
 ## Manifest
 

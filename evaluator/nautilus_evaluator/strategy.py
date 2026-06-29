@@ -398,6 +398,9 @@ def _run_compiled_strategy(
     entry_bar_price: Optional[int] = None
     entry_bar_index: Optional[int] = None
     entry_bar_time_ns: Optional[int] = None
+    entry_taken = False
+    allow_reentry = "cooldownBarsAfterExit" in spec.raw.get("riskControls", {})
+    last_exit_bar_index: Optional[int] = None
 
     for index, bar in enumerate(bars):
         if pending_order is not None:
@@ -420,13 +423,17 @@ def _run_compiled_strategy(
             orders.append(order)
             position_quantity += order.quantity if order.side == "buy" else -order.quantity
             if order.side == "buy":
+                entry_taken = True
                 entry_bar_price = bar.open
                 entry_bar_index = index
                 entry_bar_time_ns = bar.ts_event
             else:
+                if allow_reentry:
+                    entry_taken = False
                 entry_bar_price = None
                 entry_bar_index = None
                 entry_bar_time_ns = None
+                last_exit_bar_index = index
             pending_order = None
 
         if (
@@ -451,9 +458,12 @@ def _run_compiled_strategy(
                     )
                 )
                 position_quantity = 0
+                if allow_reentry:
+                    entry_taken = False
                 entry_bar_price = None
                 entry_bar_index = None
                 entry_bar_time_ns = None
+                last_exit_bar_index = index
                 continue
 
             matched_exit_rule = _matching_feature_rule(
@@ -487,9 +497,12 @@ def _run_compiled_strategy(
                     )
                 )
                 position_quantity = 0
+                if allow_reentry:
+                    entry_taken = False
                 entry_bar_price = None
                 entry_bar_index = None
                 entry_bar_time_ns = None
+                last_exit_bar_index = index
                 continue
 
         if bar.ts_event >= flat_at_ns and position_quantity > 0:
@@ -507,16 +520,27 @@ def _run_compiled_strategy(
                 )
             )
             position_quantity = 0
+            if allow_reentry:
+                entry_taken = False
             entry_bar_price = None
             entry_bar_index = None
             entry_bar_time_ns = None
+            last_exit_bar_index = index
             continue
 
         is_last_bar = index == len(bars) - 1
-        can_enter = not is_last_bar and position_quantity == 0 and pending_order is None
-        if can_enter and bars[index + 1].ts_event < flat_at_ns:
-            matched_rule = _matching_feature_rule(spec.entry_rules, dataset.features, bar.ts_event)
-            if matched_rule is not None:
+        can_enter = (
+            not is_last_bar
+            and position_quantity == 0
+            and pending_order is None
+            and not entry_taken
+        )
+        cooldown_complete = (
+            last_exit_bar_index is None
+            or index - last_exit_bar_index > spec.risk_controls.cooldown_bars_after_exit
+        )
+        if can_enter and cooldown_complete and bars[index + 1].ts_event < flat_at_ns:
+            if _all_feature_rules_match(spec.entry_rules, dataset.features, bar.ts_event):
                 pending_order = PendingOrder(
                     side="buy",
                     quantity=spec.sizing.quantity,
@@ -547,6 +571,24 @@ def _run_compiled_strategy(
     return orders
 
 
+def _all_feature_rules_match(
+    rules: List[FeatureEqualsEntryRule],
+    features: List[FeatureRecord],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
+    return bool(rules) and all(
+        _feature_rule_matches(
+            rule,
+            features,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        )
+        for rule in rules
+    )
+
+
 def _matching_feature_rule(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
@@ -554,6 +596,24 @@ def _matching_feature_rule(
     *,
     earliest_feature_ns: Optional[int] = None,
 ) -> Optional[FeatureEqualsEntryRule]:
+    for rule in rules:
+        if _feature_rule_matches(
+            rule,
+            features,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        ):
+            return rule
+    return None
+
+
+def _feature_rule_matches(
+    rule: FeatureEqualsEntryRule,
+    features: List[FeatureRecord],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
     available_features = [
         feature
         for feature in features
@@ -563,16 +623,13 @@ def _matching_feature_rule(
             or timestamp_to_nanoseconds(feature.availability_time) >= earliest_feature_ns
         )
     ]
-    for rule in rules:
-        if any(
-            feature.indicator_id == rule.indicator_id
-            and (rule.feature_type is None or feature.type == rule.feature_type)
-            and feature.name == rule.name
-            and feature.value == rule.value
-            for feature in available_features
-        ):
-            return rule
-    return None
+    return any(
+        feature.indicator_id == rule.indicator_id
+        and (rule.feature_type is None or feature.type == rule.feature_type)
+        and feature.name == rule.name
+        and feature.value == rule.value
+        for feature in available_features
+    )
 
 
 def _execute_order(

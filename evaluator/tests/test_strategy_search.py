@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 import json
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -13,10 +15,13 @@ sys.path.insert(0, str(REPO_ROOT / "evaluator"))
 from nautilus_evaluator import CostModel, FitnessConstraints, WalkForwardConfig
 from nautilus_evaluator import (
     BoundedSearchConfig,
+    LuxAlgoIctSmcLongTemplateConfig,
     StrategyTemplate,
+    create_luxalgo_ict_smc_long_strategy_template,
     generate_bounded_template_specs,
     reproduce_search_winner,
     run_bounded_strategy_search,
+    validate_strategy_spec,
 )
 
 
@@ -46,6 +51,114 @@ BASE_SPEC = {
 
 
 class StrategySearchTests(unittest.TestCase):
+    def test_luxalgo_ict_smc_long_template_generates_schema_valid_signal_specs(self):
+        template = create_luxalgo_ict_smc_long_strategy_template(
+            LuxAlgoIctSmcLongTemplateConfig(
+                indicator_id="LUX;ICT_SMC",
+                event_types=("bos", "mss"),
+                zone_types=("order_block", "fair_value_gap"),
+                zone_preferences=("nearest-any", "prefer-OB"),
+                confirmation_modes=("touch", "reclaim"),
+                max_bars_after_structure_event=(4, 8),
+                cooldown_bars_after_exit=(0, 2),
+                stop_loss_ticks=(8, 12),
+                max_bars_in_trade=(12, 24),
+            )
+        )
+
+        specs = generate_bounded_template_specs(
+            [template],
+            BoundedSearchConfig(method="deterministic", max_candidates=5),
+        )
+
+        self.assertEqual(len(specs), 5)
+        first = validate_strategy_spec(specs[0])
+        self.assertEqual([rule.feature_type for rule in first.entry_rules], ["signal", "signal"])
+        self.assertEqual(first.entry_rules[0].name, "bullish_bos")
+        self.assertEqual(first.entry_rules[1].name, "bullish_liquidity_zone_touch_entry")
+        self.assertEqual(first.exits.reverse_signal_rules[0].name, "bearish_bos")
+        self.assertEqual(first.risk_controls.cooldown_bars_after_exit, 0)
+        self.assertEqual(specs[0]["parameters"]["liquidityZoneType"], "order_block")
+        self.assertIn("parameters.zonePreference", template.choices)
+        self.assertIn("parameters.maxBarsAfterStructureEvent", template.choices)
+        self.assertIn("riskControls.cooldownBarsAfterExit", template.choices)
+        self.assertIn("riskControls.stopLossTicks", template.choices)
+        self.assertIn("exits.maxBarsInTrade", template.choices)
+
+    def test_bounded_search_records_mocked_signal_walk_forward_selection_trade_threshold(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_search_dataset(Path(temp_dir) / "dataset")
+            registry_path = Path(temp_dir) / "run-registry"
+            template = create_luxalgo_ict_smc_long_strategy_template(
+                LuxAlgoIctSmcLongTemplateConfig(
+                    indicator_id="LUX;ICT_SMC",
+                    event_types=("bos",),
+                    zone_types=("order_block",),
+                    zone_preferences=("nearest-any",),
+                    confirmation_modes=("touch",),
+                    max_bars_after_structure_event=(4,),
+                    cooldown_bars_after_exit=(0,),
+                    stop_loss_ticks=(8, 12),
+                    max_bars_in_trade=(12,),
+                )
+            )
+
+            def fake_candidate_result(*, strategy_spec, **kwargs):
+                return _fake_walk_forward_result(
+                    registry_path,
+                    strategy_spec["strategyId"],
+                    trade_count=12 if strategy_spec["riskControls"]["stopLossTicks"] == 8 else 35,
+                    survived=True,
+                )
+
+            def fake_selection_result(*, candidate_specs, **kwargs):
+                selected = candidate_specs[1]
+                return _fake_walk_forward_result(
+                    registry_path,
+                    "walk-forward-selected-candidates",
+                    trade_count=12,
+                    survived=True,
+                    selection_results=[
+                        SimpleNamespace(
+                            window_id="wf-1",
+                            selected_candidate_id="candidate-2",
+                            selected_strategy_id=selected["strategyId"],
+                        )
+                    ],
+                )
+
+            with patch(
+                "nautilus_evaluator.search.run_walk_forward_backtest",
+                side_effect=fake_candidate_result,
+            ), patch(
+                "nautilus_evaluator.search.run_walk_forward_candidate_selection_backtest",
+                side_effect=fake_selection_result,
+            ), patch(
+                "nautilus_evaluator.search._nautilus_validation_rejection_reasons",
+                return_value=[],
+            ):
+                result = run_bounded_strategy_search(
+                    dataset_path=dataset_path,
+                    templates=[template],
+                    cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                    registry_path=registry_path,
+                    walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1),
+                    fitness_constraints=FitnessConstraints(min_trades=0, min_profitable_windows=0),
+                    search_config=BoundedSearchConfig(method="deterministic", max_candidates=2),
+                )
+
+            self.assertEqual(result.winning_candidate.strategy_id, "walk-forward-selected-candidates")
+            self.assertEqual(
+                result.winning_candidate.result.selection_results[0].selected_strategy_id,
+                "luxalgo-ict-smc-long-2",
+            )
+            search_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
+            self.assertEqual(search_record["evaluatedSpecs"][0]["totalTradeCount"], 12)
+            self.assertEqual(search_record["evaluatedSpecs"][0]["tradeComparison"]["threshold"], 30)
+            self.assertEqual(search_record["evaluatedSpecs"][0]["tradeComparison"]["status"], "below_threshold")
+            self.assertEqual(search_record["evaluatedSpecs"][1]["tradeComparison"]["status"], "eligible")
+            self.assertEqual(search_record["winningRun"]["tradeComparison"]["status"], "below_threshold")
+
     def test_bounded_template_search_generates_schema_valid_specs(self):
         specs = generate_bounded_template_specs(
             [
@@ -552,6 +665,42 @@ def _direction_feature(feature_id: str, timestamp: str, value: int):
         "repaintingRisk": "confirmed",
         "value": value,
     }
+
+
+def _fake_walk_forward_result(
+    registry_path: Path,
+    strategy_id: str,
+    *,
+    trade_count: int,
+    survived: bool,
+    selection_results=None,
+):
+    run_path = registry_path / f"mock-{strategy_id}"
+    run_path.mkdir(parents=True, exist_ok=True)
+    record_path = run_path / "run.json"
+    record_path.write_text(json.dumps({"recordType": "Nautilus Walk-Forward Validation"}), encoding="utf-8")
+    fitness = SimpleNamespace(
+        survived=survived,
+        score=1.0 if survived else None,
+        rejection_reasons=[] if survived else ["min_trades"],
+        survival_checks={},
+        ranking_inputs={
+            "outOfSampleSharpe": 1.0,
+            "netPnl": 100,
+            "grossPnl": 100,
+            "totalCosts": 0,
+            "tradeCount": trade_count,
+            "maxDrawdown": 0,
+        },
+    )
+    return SimpleNamespace(
+        strategy_id=strategy_id,
+        fitness=fitness,
+        registry_record_path=record_path,
+        training_window_results=[],
+        window_results=[],
+        selection_results=selection_results or [],
+    )
 
 
 if __name__ == "__main__":

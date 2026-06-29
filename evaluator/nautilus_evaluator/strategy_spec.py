@@ -29,6 +29,7 @@ class RiskControls:
     flat_before_close_minutes: int
     stop_loss_ticks: int
     take_profit_ticks: int
+    cooldown_bars_after_exit: int
 
 
 @dataclass(frozen=True)
@@ -210,10 +211,16 @@ def _parse_feature_equals_rule(
 def _parse_risk_controls(value: Any, errors: List[str]) -> RiskControls:
     if not isinstance(value, dict):
         errors.append("riskControls must be an object")
-        return RiskControls(False, 0, 0, 0)
+        return RiskControls(False, 0, 0, 0, 0)
     _reject_unknown_keys(
         value,
-        {"intradayFlat", "flatBeforeCloseMinutes", "stopLossTicks", "takeProfitTicks"},
+        {
+            "intradayFlat",
+            "flatBeforeCloseMinutes",
+            "stopLossTicks",
+            "takeProfitTicks",
+            "cooldownBarsAfterExit",
+        },
         "riskControls",
         errors,
     )
@@ -222,6 +229,7 @@ def _parse_risk_controls(value: Any, errors: List[str]) -> RiskControls:
     flat_before_close_minutes = value.get("flatBeforeCloseMinutes")
     stop_loss_ticks = value.get("stopLossTicks")
     take_profit_ticks = value.get("takeProfitTicks")
+    cooldown_bars_after_exit = value.get("cooldownBarsAfterExit", 0)
 
     if intraday_flat is not True:
         errors.append("riskControls.intradayFlat must be true")
@@ -231,12 +239,19 @@ def _parse_risk_controls(value: Any, errors: List[str]) -> RiskControls:
         errors.append("riskControls.stopLossTicks must be a positive integer")
     if not _is_positive_int(take_profit_ticks):
         errors.append("riskControls.takeProfitTicks must be a positive integer")
+    if not _is_non_negative_int(cooldown_bars_after_exit):
+        errors.append("riskControls.cooldownBarsAfterExit must be a non-negative integer")
 
     return RiskControls(
         intraday_flat=intraday_flat is True,
         flat_before_close_minutes=flat_before_close_minutes if isinstance(flat_before_close_minutes, int) else 0,
         stop_loss_ticks=stop_loss_ticks if isinstance(stop_loss_ticks, int) else 0,
         take_profit_ticks=take_profit_ticks if isinstance(take_profit_ticks, int) else 0,
+        cooldown_bars_after_exit=(
+            cooldown_bars_after_exit
+            if isinstance(cooldown_bars_after_exit, int)
+            else 0
+        ),
     )
 
 
