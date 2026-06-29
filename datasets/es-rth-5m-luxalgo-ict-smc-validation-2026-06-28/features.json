@@ -1,0 +1,1327 @@
+[
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-22T13-30-00-000Z:2026-06-22T13-35-00-000Z:0",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-22T13:30:00.000Z",
+    "availabilityTime": "2026-06-22T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5502,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_up",
+      "graphicKind": "label",
+      "graphicId": 1,
+      "sourceFields": {
+        "id": 1,
+        "x": 0,
+        "y": 5502,
+        "text": "BOS",
+        "style": "label_up",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_bos:2026-06-22T13-30-00-000Z:2026-06-22T13-35-00-000Z:30",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_bos",
+    "eventTime": "2026-06-22T13:30:00.000Z",
+    "availabilityTime": "2026-06-22T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-22T13-30-00-000Z:2026-06-22T13-35-00-000Z:0"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bullish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_up"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-22T13-30-00-000Z:2026-06-22T13-40-00-000Z:15",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-22T13:30:00.000Z",
+    "availabilityTime": "2026-06-22T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-22T13:30:00.000Z",
+      "endTime": "2026-06-22T13:40:00.000Z",
+      "top": 5500.5,
+      "bottom": 5400,
+      "text": "Bullish OB",
+      "graphicKind": "box",
+      "graphicId": 10,
+      "sourceFields": {
+        "id": 10,
+        "name": "bullish_order_block",
+        "x1": 0,
+        "y1": 5500.5,
+        "x2": 2,
+        "y2": 5400,
+        "text": "Bullish OB"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_liquidity_zone_touch_entry:2026-06-22T13-40-00-000Z:2026-06-22T13-40-00-000Z:40",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_liquidity_zone_touch_entry",
+    "eventTime": "2026-06-22T13:40:00.000Z",
+    "availabilityTime": "2026-06-22T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-22T13-30-00-000Z:2026-06-22T13-35-00-000Z:0",
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-22T13-30-00-000Z:2026-06-22T13-40-00-000Z:15"
+        ],
+        "derivation": {
+          "rule": "luxalgo-liquidity-zone-entry",
+          "version": "1"
+        },
+        "structureEvent": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-22T13-30-00-000Z:2026-06-22T13-35-00-000Z:0",
+          "name": "BOS",
+          "direction": "bullish",
+          "eventTime": "2026-06-22T13:30:00.000Z",
+          "availabilityTime": "2026-06-22T13:35:00.000Z",
+          "directionEvidence": {
+            "direction": "bullish",
+            "evidenceType": "label_style",
+            "evidenceValue": "label_up"
+          }
+        },
+        "selectedZone": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-22T13-30-00-000Z:2026-06-22T13-40-00-000Z:15",
+          "kind": "order_block",
+          "direction": "bullish",
+          "eventTime": "2026-06-22T13:30:00.000Z",
+          "availabilityTime": "2026-06-22T13:40:00.000Z",
+          "top": 5500.5,
+          "bottom": 5400
+        },
+        "confirmation": {
+          "mode": "touch",
+          "barTime": "2026-06-22T13:40:00.000Z",
+          "bar": {
+            "open": 5502,
+            "high": 5503.75,
+            "low": 5500.5,
+            "close": 5502.75
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_fair_value_gap:2026-06-22T16-00-00-000Z:2026-06-22T16-05-00-000Z:16",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_fair_value_gap",
+    "eventTime": "2026-06-22T16:00:00.000Z",
+    "availabilityTime": "2026-06-22T16:05:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-22T16:00:00.000Z",
+      "endTime": "2026-06-22T16:05:00.000Z",
+      "top": 5504.75,
+      "bottom": 5400,
+      "text": "Bullish FVG",
+      "graphicKind": "box",
+      "graphicId": 11,
+      "sourceFields": {
+        "id": 11,
+        "name": "bullish_fair_value_gap",
+        "x1": 30,
+        "y1": 5504.75,
+        "x2": 31,
+        "y2": 5400,
+        "text": "Bullish FVG"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-22T18-30-00-000Z:2026-06-22T18-35-00-000Z:2",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "MSS",
+    "eventTime": "2026-06-22T18:30:00.000Z",
+    "availabilityTime": "2026-06-22T18:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5508,
+      "yLoc": "price",
+      "text": "MSS",
+      "style": "label_left",
+      "graphicKind": "label",
+      "graphicId": 3,
+      "sourceFields": {
+        "id": 3,
+        "x": 60,
+        "y": 5508,
+        "text": "MSS",
+        "style": "label_left",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-22T18-40-00-000Z:2026-06-22T18-40-00-000Z:17",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-22T18:40:00.000Z",
+    "availabilityTime": "2026-06-22T18:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-22T18:40:00.000Z",
+      "endTime": null,
+      "text": "Bullish OB missing geometry",
+      "graphicKind": "box",
+      "graphicId": 12,
+      "sourceFields": {
+        "id": 12,
+        "name": "bullish_order_block",
+        "x1": 62,
+        "text": "Bullish OB missing geometry"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-22T19-50-00-000Z:2026-06-22T19-55-00-000Z:1",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-22T19:50:00.000Z",
+    "availabilityTime": "2026-06-22T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5507,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_down",
+      "graphicKind": "label",
+      "graphicId": 2,
+      "sourceFields": {
+        "id": 2,
+        "x": 76,
+        "y": 5507,
+        "text": "BOS",
+        "style": "label_down",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bearish_bos:2026-06-22T19-50-00-000Z:2026-06-22T19-55-00-000Z:31",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bearish_bos",
+    "eventTime": "2026-06-22T19:50:00.000Z",
+    "availabilityTime": "2026-06-22T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-22T19-50-00-000Z:2026-06-22T19-55-00-000Z:1"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bearish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_down"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-23T13-30-00-000Z:2026-06-23T13-35-00-000Z:3",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-23T13:30:00.000Z",
+    "availabilityTime": "2026-06-23T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5514,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_up",
+      "graphicKind": "label",
+      "graphicId": 101,
+      "sourceFields": {
+        "id": 101,
+        "x": 78,
+        "y": 5514,
+        "text": "BOS",
+        "style": "label_up",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_bos:2026-06-23T13-30-00-000Z:2026-06-23T13-35-00-000Z:32",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_bos",
+    "eventTime": "2026-06-23T13:30:00.000Z",
+    "availabilityTime": "2026-06-23T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-23T13-30-00-000Z:2026-06-23T13-35-00-000Z:3"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bullish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_up"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-23T13-30-00-000Z:2026-06-23T13-40-00-000Z:18",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-23T13:30:00.000Z",
+    "availabilityTime": "2026-06-23T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-23T13:30:00.000Z",
+      "endTime": "2026-06-23T13:40:00.000Z",
+      "top": 5512.5,
+      "bottom": 5400,
+      "text": "Bullish OB",
+      "graphicKind": "box",
+      "graphicId": 110,
+      "sourceFields": {
+        "id": 110,
+        "name": "bullish_order_block",
+        "x1": 78,
+        "y1": 5512.5,
+        "x2": 80,
+        "y2": 5400,
+        "text": "Bullish OB"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_liquidity_zone_touch_entry:2026-06-23T13-40-00-000Z:2026-06-23T13-40-00-000Z:41",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_liquidity_zone_touch_entry",
+    "eventTime": "2026-06-23T13:40:00.000Z",
+    "availabilityTime": "2026-06-23T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-23T13-30-00-000Z:2026-06-23T13-35-00-000Z:3",
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-23T13-30-00-000Z:2026-06-23T13-40-00-000Z:18"
+        ],
+        "derivation": {
+          "rule": "luxalgo-liquidity-zone-entry",
+          "version": "1"
+        },
+        "structureEvent": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-23T13-30-00-000Z:2026-06-23T13-35-00-000Z:3",
+          "name": "BOS",
+          "direction": "bullish",
+          "eventTime": "2026-06-23T13:30:00.000Z",
+          "availabilityTime": "2026-06-23T13:35:00.000Z",
+          "directionEvidence": {
+            "direction": "bullish",
+            "evidenceType": "label_style",
+            "evidenceValue": "label_up"
+          }
+        },
+        "selectedZone": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-23T13-30-00-000Z:2026-06-23T13-40-00-000Z:18",
+          "kind": "order_block",
+          "direction": "bullish",
+          "eventTime": "2026-06-23T13:30:00.000Z",
+          "availabilityTime": "2026-06-23T13:40:00.000Z",
+          "top": 5512.5,
+          "bottom": 5400
+        },
+        "confirmation": {
+          "mode": "touch",
+          "barTime": "2026-06-23T13:40:00.000Z",
+          "bar": {
+            "open": 5514,
+            "high": 5515.75,
+            "low": 5512.5,
+            "close": 5514.75
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_fair_value_gap:2026-06-23T16-00-00-000Z:2026-06-23T16-05-00-000Z:19",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_fair_value_gap",
+    "eventTime": "2026-06-23T16:00:00.000Z",
+    "availabilityTime": "2026-06-23T16:05:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-23T16:00:00.000Z",
+      "endTime": "2026-06-23T16:05:00.000Z",
+      "top": 5516.75,
+      "bottom": 5400,
+      "text": "Bullish FVG",
+      "graphicKind": "box",
+      "graphicId": 111,
+      "sourceFields": {
+        "id": 111,
+        "name": "bullish_fair_value_gap",
+        "x1": 108,
+        "y1": 5516.75,
+        "x2": 109,
+        "y2": 5400,
+        "text": "Bullish FVG"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-23T18-30-00-000Z:2026-06-23T18-35-00-000Z:5",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "MSS",
+    "eventTime": "2026-06-23T18:30:00.000Z",
+    "availabilityTime": "2026-06-23T18:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5520,
+      "yLoc": "price",
+      "text": "MSS",
+      "style": "label_left",
+      "graphicKind": "label",
+      "graphicId": 103,
+      "sourceFields": {
+        "id": 103,
+        "x": 138,
+        "y": 5520,
+        "text": "MSS",
+        "style": "label_left",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-23T18-40-00-000Z:2026-06-23T18-40-00-000Z:20",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-23T18:40:00.000Z",
+    "availabilityTime": "2026-06-23T18:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-23T18:40:00.000Z",
+      "endTime": null,
+      "text": "Bullish OB missing geometry",
+      "graphicKind": "box",
+      "graphicId": 112,
+      "sourceFields": {
+        "id": 112,
+        "name": "bullish_order_block",
+        "x1": 140,
+        "text": "Bullish OB missing geometry"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-23T19-50-00-000Z:2026-06-23T19-55-00-000Z:4",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-23T19:50:00.000Z",
+    "availabilityTime": "2026-06-23T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5519,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_down",
+      "graphicKind": "label",
+      "graphicId": 102,
+      "sourceFields": {
+        "id": 102,
+        "x": 154,
+        "y": 5519,
+        "text": "BOS",
+        "style": "label_down",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bearish_bos:2026-06-23T19-50-00-000Z:2026-06-23T19-55-00-000Z:33",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bearish_bos",
+    "eventTime": "2026-06-23T19:50:00.000Z",
+    "availabilityTime": "2026-06-23T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-23T19-50-00-000Z:2026-06-23T19-55-00-000Z:4"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bearish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_down"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-24T13-30-00-000Z:2026-06-24T13-35-00-000Z:6",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-24T13:30:00.000Z",
+    "availabilityTime": "2026-06-24T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5526,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_up",
+      "graphicKind": "label",
+      "graphicId": 201,
+      "sourceFields": {
+        "id": 201,
+        "x": 156,
+        "y": 5526,
+        "text": "BOS",
+        "style": "label_up",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_bos:2026-06-24T13-30-00-000Z:2026-06-24T13-35-00-000Z:34",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_bos",
+    "eventTime": "2026-06-24T13:30:00.000Z",
+    "availabilityTime": "2026-06-24T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-24T13-30-00-000Z:2026-06-24T13-35-00-000Z:6"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bullish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_up"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-24T13-30-00-000Z:2026-06-24T13-40-00-000Z:21",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-24T13:30:00.000Z",
+    "availabilityTime": "2026-06-24T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-24T13:30:00.000Z",
+      "endTime": "2026-06-24T13:40:00.000Z",
+      "top": 5524.5,
+      "bottom": 5400,
+      "text": "Bullish OB",
+      "graphicKind": "box",
+      "graphicId": 210,
+      "sourceFields": {
+        "id": 210,
+        "name": "bullish_order_block",
+        "x1": 156,
+        "y1": 5524.5,
+        "x2": 158,
+        "y2": 5400,
+        "text": "Bullish OB"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_liquidity_zone_touch_entry:2026-06-24T13-40-00-000Z:2026-06-24T13-40-00-000Z:42",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_liquidity_zone_touch_entry",
+    "eventTime": "2026-06-24T13:40:00.000Z",
+    "availabilityTime": "2026-06-24T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-24T13-30-00-000Z:2026-06-24T13-35-00-000Z:6",
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-24T13-30-00-000Z:2026-06-24T13-40-00-000Z:21"
+        ],
+        "derivation": {
+          "rule": "luxalgo-liquidity-zone-entry",
+          "version": "1"
+        },
+        "structureEvent": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-24T13-30-00-000Z:2026-06-24T13-35-00-000Z:6",
+          "name": "BOS",
+          "direction": "bullish",
+          "eventTime": "2026-06-24T13:30:00.000Z",
+          "availabilityTime": "2026-06-24T13:35:00.000Z",
+          "directionEvidence": {
+            "direction": "bullish",
+            "evidenceType": "label_style",
+            "evidenceValue": "label_up"
+          }
+        },
+        "selectedZone": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-24T13-30-00-000Z:2026-06-24T13-40-00-000Z:21",
+          "kind": "order_block",
+          "direction": "bullish",
+          "eventTime": "2026-06-24T13:30:00.000Z",
+          "availabilityTime": "2026-06-24T13:40:00.000Z",
+          "top": 5524.5,
+          "bottom": 5400
+        },
+        "confirmation": {
+          "mode": "touch",
+          "barTime": "2026-06-24T13:40:00.000Z",
+          "bar": {
+            "open": 5526,
+            "high": 5527.75,
+            "low": 5524.5,
+            "close": 5526.75
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_fair_value_gap:2026-06-24T16-00-00-000Z:2026-06-24T16-05-00-000Z:22",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_fair_value_gap",
+    "eventTime": "2026-06-24T16:00:00.000Z",
+    "availabilityTime": "2026-06-24T16:05:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-24T16:00:00.000Z",
+      "endTime": "2026-06-24T16:05:00.000Z",
+      "top": 5528.75,
+      "bottom": 5400,
+      "text": "Bullish FVG",
+      "graphicKind": "box",
+      "graphicId": 211,
+      "sourceFields": {
+        "id": 211,
+        "name": "bullish_fair_value_gap",
+        "x1": 186,
+        "y1": 5528.75,
+        "x2": 187,
+        "y2": 5400,
+        "text": "Bullish FVG"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-24T18-30-00-000Z:2026-06-24T18-35-00-000Z:8",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "MSS",
+    "eventTime": "2026-06-24T18:30:00.000Z",
+    "availabilityTime": "2026-06-24T18:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5532,
+      "yLoc": "price",
+      "text": "MSS",
+      "style": "label_left",
+      "graphicKind": "label",
+      "graphicId": 203,
+      "sourceFields": {
+        "id": 203,
+        "x": 216,
+        "y": 5532,
+        "text": "MSS",
+        "style": "label_left",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-24T18-40-00-000Z:2026-06-24T18-40-00-000Z:23",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-24T18:40:00.000Z",
+    "availabilityTime": "2026-06-24T18:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-24T18:40:00.000Z",
+      "endTime": null,
+      "text": "Bullish OB missing geometry",
+      "graphicKind": "box",
+      "graphicId": 212,
+      "sourceFields": {
+        "id": 212,
+        "name": "bullish_order_block",
+        "x1": 218,
+        "text": "Bullish OB missing geometry"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-24T19-50-00-000Z:2026-06-24T19-55-00-000Z:7",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-24T19:50:00.000Z",
+    "availabilityTime": "2026-06-24T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5531,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_down",
+      "graphicKind": "label",
+      "graphicId": 202,
+      "sourceFields": {
+        "id": 202,
+        "x": 232,
+        "y": 5531,
+        "text": "BOS",
+        "style": "label_down",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bearish_bos:2026-06-24T19-50-00-000Z:2026-06-24T19-55-00-000Z:35",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bearish_bos",
+    "eventTime": "2026-06-24T19:50:00.000Z",
+    "availabilityTime": "2026-06-24T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-24T19-50-00-000Z:2026-06-24T19-55-00-000Z:7"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bearish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_down"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-25T13-30-00-000Z:2026-06-25T13-35-00-000Z:9",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-25T13:30:00.000Z",
+    "availabilityTime": "2026-06-25T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5538,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_up",
+      "graphicKind": "label",
+      "graphicId": 301,
+      "sourceFields": {
+        "id": 301,
+        "x": 234,
+        "y": 5538,
+        "text": "BOS",
+        "style": "label_up",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_bos:2026-06-25T13-30-00-000Z:2026-06-25T13-35-00-000Z:36",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_bos",
+    "eventTime": "2026-06-25T13:30:00.000Z",
+    "availabilityTime": "2026-06-25T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-25T13-30-00-000Z:2026-06-25T13-35-00-000Z:9"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bullish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_up"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-25T13-30-00-000Z:2026-06-25T13-40-00-000Z:24",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-25T13:30:00.000Z",
+    "availabilityTime": "2026-06-25T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-25T13:30:00.000Z",
+      "endTime": "2026-06-25T13:40:00.000Z",
+      "top": 5536.5,
+      "bottom": 5400,
+      "text": "Bullish OB",
+      "graphicKind": "box",
+      "graphicId": 310,
+      "sourceFields": {
+        "id": 310,
+        "name": "bullish_order_block",
+        "x1": 234,
+        "y1": 5536.5,
+        "x2": 236,
+        "y2": 5400,
+        "text": "Bullish OB"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_liquidity_zone_touch_entry:2026-06-25T13-40-00-000Z:2026-06-25T13-40-00-000Z:43",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_liquidity_zone_touch_entry",
+    "eventTime": "2026-06-25T13:40:00.000Z",
+    "availabilityTime": "2026-06-25T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-25T13-30-00-000Z:2026-06-25T13-35-00-000Z:9",
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-25T13-30-00-000Z:2026-06-25T13-40-00-000Z:24"
+        ],
+        "derivation": {
+          "rule": "luxalgo-liquidity-zone-entry",
+          "version": "1"
+        },
+        "structureEvent": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-25T13-30-00-000Z:2026-06-25T13-35-00-000Z:9",
+          "name": "BOS",
+          "direction": "bullish",
+          "eventTime": "2026-06-25T13:30:00.000Z",
+          "availabilityTime": "2026-06-25T13:35:00.000Z",
+          "directionEvidence": {
+            "direction": "bullish",
+            "evidenceType": "label_style",
+            "evidenceValue": "label_up"
+          }
+        },
+        "selectedZone": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-25T13-30-00-000Z:2026-06-25T13-40-00-000Z:24",
+          "kind": "order_block",
+          "direction": "bullish",
+          "eventTime": "2026-06-25T13:30:00.000Z",
+          "availabilityTime": "2026-06-25T13:40:00.000Z",
+          "top": 5536.5,
+          "bottom": 5400
+        },
+        "confirmation": {
+          "mode": "touch",
+          "barTime": "2026-06-25T13:40:00.000Z",
+          "bar": {
+            "open": 5538,
+            "high": 5539.75,
+            "low": 5536.5,
+            "close": 5538.75
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_fair_value_gap:2026-06-25T16-00-00-000Z:2026-06-25T16-05-00-000Z:25",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_fair_value_gap",
+    "eventTime": "2026-06-25T16:00:00.000Z",
+    "availabilityTime": "2026-06-25T16:05:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-25T16:00:00.000Z",
+      "endTime": "2026-06-25T16:05:00.000Z",
+      "top": 5540.75,
+      "bottom": 5400,
+      "text": "Bullish FVG",
+      "graphicKind": "box",
+      "graphicId": 311,
+      "sourceFields": {
+        "id": 311,
+        "name": "bullish_fair_value_gap",
+        "x1": 264,
+        "y1": 5540.75,
+        "x2": 265,
+        "y2": 5400,
+        "text": "Bullish FVG"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-25T18-30-00-000Z:2026-06-25T18-35-00-000Z:11",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "MSS",
+    "eventTime": "2026-06-25T18:30:00.000Z",
+    "availabilityTime": "2026-06-25T18:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5544,
+      "yLoc": "price",
+      "text": "MSS",
+      "style": "label_left",
+      "graphicKind": "label",
+      "graphicId": 303,
+      "sourceFields": {
+        "id": 303,
+        "x": 294,
+        "y": 5544,
+        "text": "MSS",
+        "style": "label_left",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-25T18-40-00-000Z:2026-06-25T18-40-00-000Z:26",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-25T18:40:00.000Z",
+    "availabilityTime": "2026-06-25T18:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-25T18:40:00.000Z",
+      "endTime": null,
+      "text": "Bullish OB missing geometry",
+      "graphicKind": "box",
+      "graphicId": 312,
+      "sourceFields": {
+        "id": 312,
+        "name": "bullish_order_block",
+        "x1": 296,
+        "text": "Bullish OB missing geometry"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-25T19-50-00-000Z:2026-06-25T19-55-00-000Z:10",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-25T19:50:00.000Z",
+    "availabilityTime": "2026-06-25T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5543,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_down",
+      "graphicKind": "label",
+      "graphicId": 302,
+      "sourceFields": {
+        "id": 302,
+        "x": 310,
+        "y": 5543,
+        "text": "BOS",
+        "style": "label_down",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bearish_bos:2026-06-25T19-50-00-000Z:2026-06-25T19-55-00-000Z:37",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bearish_bos",
+    "eventTime": "2026-06-25T19:50:00.000Z",
+    "availabilityTime": "2026-06-25T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-25T19-50-00-000Z:2026-06-25T19-55-00-000Z:10"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bearish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_down"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-26T13-30-00-000Z:2026-06-26T13-35-00-000Z:12",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-26T13:30:00.000Z",
+    "availabilityTime": "2026-06-26T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5550,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_up",
+      "graphicKind": "label",
+      "graphicId": 401,
+      "sourceFields": {
+        "id": 401,
+        "x": 312,
+        "y": 5550,
+        "text": "BOS",
+        "style": "label_up",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_bos:2026-06-26T13-30-00-000Z:2026-06-26T13-35-00-000Z:38",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_bos",
+    "eventTime": "2026-06-26T13:30:00.000Z",
+    "availabilityTime": "2026-06-26T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-26T13-30-00-000Z:2026-06-26T13-35-00-000Z:12"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bullish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_up"
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-26T13-30-00-000Z:2026-06-26T13-40-00-000Z:27",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-26T13:30:00.000Z",
+    "availabilityTime": "2026-06-26T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-26T13:30:00.000Z",
+      "endTime": "2026-06-26T13:40:00.000Z",
+      "top": 5548.5,
+      "bottom": 5400,
+      "text": "Bullish OB",
+      "graphicKind": "box",
+      "graphicId": 410,
+      "sourceFields": {
+        "id": 410,
+        "name": "bullish_order_block",
+        "x1": 312,
+        "y1": 5548.5,
+        "x2": 314,
+        "y2": 5400,
+        "text": "Bullish OB"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bullish_liquidity_zone_touch_entry:2026-06-26T13-40-00-000Z:2026-06-26T13-40-00-000Z:44",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bullish_liquidity_zone_touch_entry",
+    "eventTime": "2026-06-26T13:40:00.000Z",
+    "availabilityTime": "2026-06-26T13:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-26T13-30-00-000Z:2026-06-26T13-35-00-000Z:12",
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-26T13-30-00-000Z:2026-06-26T13-40-00-000Z:27"
+        ],
+        "derivation": {
+          "rule": "luxalgo-liquidity-zone-entry",
+          "version": "1"
+        },
+        "structureEvent": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-26T13-30-00-000Z:2026-06-26T13-35-00-000Z:12",
+          "name": "BOS",
+          "direction": "bullish",
+          "eventTime": "2026-06-26T13:30:00.000Z",
+          "availabilityTime": "2026-06-26T13:35:00.000Z",
+          "directionEvidence": {
+            "direction": "bullish",
+            "evidenceType": "label_style",
+            "evidenceValue": "label_up"
+          }
+        },
+        "selectedZone": {
+          "featureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-26T13-30-00-000Z:2026-06-26T13-40-00-000Z:27",
+          "kind": "order_block",
+          "direction": "bullish",
+          "eventTime": "2026-06-26T13:30:00.000Z",
+          "availabilityTime": "2026-06-26T13:40:00.000Z",
+          "top": 5548.5,
+          "bottom": 5400
+        },
+        "confirmation": {
+          "mode": "touch",
+          "barTime": "2026-06-26T13:40:00.000Z",
+          "bar": {
+            "open": 5550,
+            "high": 5551.75,
+            "low": 5548.5,
+            "close": 5550.75
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_fair_value_gap:2026-06-26T16-00-00-000Z:2026-06-26T16-05-00-000Z:28",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_fair_value_gap",
+    "eventTime": "2026-06-26T16:00:00.000Z",
+    "availabilityTime": "2026-06-26T16:05:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-26T16:00:00.000Z",
+      "endTime": "2026-06-26T16:05:00.000Z",
+      "top": 5552.75,
+      "bottom": 5400,
+      "text": "Bullish FVG",
+      "graphicKind": "box",
+      "graphicId": 411,
+      "sourceFields": {
+        "id": 411,
+        "name": "bullish_fair_value_gap",
+        "x1": 342,
+        "y1": 5552.75,
+        "x2": 343,
+        "y2": 5400,
+        "text": "Bullish FVG"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-26T18-30-00-000Z:2026-06-26T18-35-00-000Z:14",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "MSS",
+    "eventTime": "2026-06-26T18:30:00.000Z",
+    "availabilityTime": "2026-06-26T18:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5556,
+      "yLoc": "price",
+      "text": "MSS",
+      "style": "label_left",
+      "graphicKind": "label",
+      "graphicId": 403,
+      "sourceFields": {
+        "id": 403,
+        "x": 372,
+        "y": 5556,
+        "text": "MSS",
+        "style": "label_left",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-26T18-40-00-000Z:2026-06-26T18-40-00-000Z:29",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "box",
+    "name": "bullish_order_block",
+    "eventTime": "2026-06-26T18:40:00.000Z",
+    "availabilityTime": "2026-06-26T18:40:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "startTime": "2026-06-26T18:40:00.000Z",
+      "endTime": null,
+      "text": "Bullish OB missing geometry",
+      "graphicKind": "box",
+      "graphicId": 412,
+      "sourceFields": {
+        "id": 412,
+        "name": "bullish_order_block",
+        "x1": 374,
+        "text": "Bullish OB missing geometry"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-26T19-50-00-000Z:2026-06-26T19-55-00-000Z:13",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "label",
+    "name": "BOS",
+    "eventTime": "2026-06-26T19:50:00.000Z",
+    "availabilityTime": "2026-06-26T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5555,
+      "yLoc": "price",
+      "text": "BOS",
+      "style": "label_down",
+      "graphicKind": "label",
+      "graphicId": 402,
+      "sourceFields": {
+        "id": 402,
+        "x": 388,
+        "y": 5555,
+        "text": "BOS",
+        "style": "label_down",
+        "yLoc": "price"
+      }
+    }
+  },
+  {
+    "id": "PUB;6daafb2cabe6419d98ae25229d2327f8:signal:bearish_bos:2026-06-26T19-50-00-000Z:2026-06-26T19-55-00-000Z:39",
+    "source": "tradingview",
+    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+    "type": "signal",
+    "name": "bearish_bos",
+    "eventTime": "2026-06-26T19:50:00.000Z",
+    "availabilityTime": "2026-06-26T19:55:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": true,
+    "metadata": {
+      "provenance": {
+        "sourceFeatureIds": [
+          "PUB;6daafb2cabe6419d98ae25229d2327f8:label:BOS:2026-06-26T19-50-00-000Z:2026-06-26T19-55-00-000Z:13"
+        ],
+        "derivation": {
+          "rule": "luxalgo-structure-event-direction",
+          "version": "1"
+        },
+        "directionEvidence": {
+          "direction": "bearish",
+          "evidenceType": "label_style",
+          "evidenceValue": "label_down"
+        }
+      }
+    }
+  }
+]

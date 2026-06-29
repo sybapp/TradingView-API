@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "rule": "luxalgo-structure-event-direction",
+      "version": "1",
+      "counts": {
+        "sourceFeatures": 15,
+        "derivedFeatures": 10,
+        "unresolvedDirection": 5
+      },
+      "warnings": [
+        "5 structure event label could not be converted to a directional signal."
+      ],
+      "examples": [
+        {
+          "kind": "unresolved_direction",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-22T18-30-00-000Z:2026-06-22T18-35-00-000Z:2",
+          "featureType": "label",
+          "featureName": "MSS",
+          "eventTime": "2026-06-22T18:30:00.000Z",
+          "reason": "unsupported label style",
+          "evidence": {
+            "text": "MSS",
+            "style": "label_left",
+            "graphicId": 3
+          }
+        },
+        {
+          "kind": "unresolved_direction",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-23T18-30-00-000Z:2026-06-23T18-35-00-000Z:5",
+          "featureType": "label",
+          "featureName": "MSS",
+          "eventTime": "2026-06-23T18:30:00.000Z",
+          "reason": "unsupported label style",
+          "evidence": {
+            "text": "MSS",
+            "style": "label_left",
+            "graphicId": 103
+          }
+        },
+        {
+          "kind": "unresolved_direction",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-24T18-30-00-000Z:2026-06-24T18-35-00-000Z:8",
+          "featureType": "label",
+          "featureName": "MSS",
+          "eventTime": "2026-06-24T18:30:00.000Z",
+          "reason": "unsupported label style",
+          "evidence": {
+            "text": "MSS",
+            "style": "label_left",
+            "graphicId": 203
+          }
+        },
+        {
+          "kind": "unresolved_direction",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-25T18-30-00-000Z:2026-06-25T18-35-00-000Z:11",
+          "featureType": "label",
+          "featureName": "MSS",
+          "eventTime": "2026-06-25T18:30:00.000Z",
+          "reason": "unsupported label style",
+          "evidence": {
+            "text": "MSS",
+            "style": "label_left",
+            "graphicId": 303
+          }
+        },
+        {
+          "kind": "unresolved_direction",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:label:MSS:2026-06-26T18-30-00-000Z:2026-06-26T18-35-00-000Z:14",
+          "featureType": "label",
+          "featureName": "MSS",
+          "eventTime": "2026-06-26T18:30:00.000Z",
+          "reason": "unsupported label style",
+          "evidence": {
+            "text": "MSS",
+            "style": "label_left",
+            "graphicId": 403
+          }
+        }
+      ]
+    },
+    {
+      "rule": "luxalgo-liquidity-zone-entry",
+      "version": "1",
+      "counts": {
+        "sourceStructureEvents": 5,
+        "invalidZoneGeometry": 5,
+        "sourceZones": 10,
+        "derivedFeatures": 5
+      },
+      "warnings": [
+        "5 liquidity zone could not be used because its geometry was invalid."
+      ],
+      "examples": [
+        {
+          "kind": "invalid_zone_geometry",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-22T18-40-00-000Z:2026-06-22T18-40-00-000Z:17",
+          "featureType": "box",
+          "featureName": "bullish_order_block",
+          "eventTime": "2026-06-22T18:40:00.000Z",
+          "reason": "missing finite top or bottom",
+          "evidence": {
+            "graphicId": 12
+          }
+        },
+        {
+          "kind": "invalid_zone_geometry",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-23T18-40-00-000Z:2026-06-23T18-40-00-000Z:20",
+          "featureType": "box",
+          "featureName": "bullish_order_block",
+          "eventTime": "2026-06-23T18:40:00.000Z",
+          "reason": "missing finite top or bottom",
+          "evidence": {
+            "graphicId": 112
+          }
+        },
+        {
+          "kind": "invalid_zone_geometry",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-24T18-40-00-000Z:2026-06-24T18-40-00-000Z:23",
+          "featureType": "box",
+          "featureName": "bullish_order_block",
+          "eventTime": "2026-06-24T18:40:00.000Z",
+          "reason": "missing finite top or bottom",
+          "evidence": {
+            "graphicId": 212
+          }
+        },
+        {
+          "kind": "invalid_zone_geometry",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-25T18-40-00-000Z:2026-06-25T18-40-00-000Z:26",
+          "featureType": "box",
+          "featureName": "bullish_order_block",
+          "eventTime": "2026-06-25T18:40:00.000Z",
+          "reason": "missing finite top or bottom",
+          "evidence": {
+            "graphicId": 312
+          }
+        },
+        {
+          "kind": "invalid_zone_geometry",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "sourceFeatureId": "PUB;6daafb2cabe6419d98ae25229d2327f8:box:bullish_order_block:2026-06-26T18-40-00-000Z:2026-06-26T18-40-00-000Z:29",
+          "featureType": "box",
+          "featureName": "bullish_order_block",
+          "eventTime": "2026-06-26T18:40:00.000Z",
+          "reason": "missing finite top or bottom",
+          "evidence": {
+            "graphicId": 412
+          }
+        }
+      ]
+    }
+  ]
+}

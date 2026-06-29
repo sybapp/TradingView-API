@@ -1,0 +1,827 @@
+{
+  "dataset": {
+    "artifacts": {
+      "bars": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28/bars.json",
+      "derivationDiagnostics": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28/derivation-diagnostics.json",
+      "features": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28/features.json",
+      "manifest": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28/manifest.json"
+    },
+    "bar": {
+      "interval": "5m",
+      "priceScale": 100,
+      "volumeUnit": "contracts"
+    },
+    "barCount": 390,
+    "bullishStructureEventSignalCount": 5,
+    "collectedAt": "2026-06-28T12:00:00.000Z",
+    "collection": {
+      "kind": "pinned-luxalgo-ict-smc-validation",
+      "liveCollected": false,
+      "source": "examples/BuildPinnedLuxAlgoIctSmcValidationDataset.js"
+    },
+    "datasetId": "es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+    "diagnosticCounts": {
+      "luxalgo-liquidity-zone-entry": {
+        "derivedFeatures": 5,
+        "invalidZoneGeometry": 5,
+        "sourceStructureEvents": 5,
+        "sourceZones": 10
+      },
+      "luxalgo-structure-event-direction": {
+        "derivedFeatures": 10,
+        "sourceFeatures": 15,
+        "unresolvedDirection": 5
+      }
+    },
+    "featureCount": 45,
+    "liquidityZoneCounts": {
+      "fair_value_gap": 5,
+      "order_block": 10
+    },
+    "rawStructureFeatureCount": 15,
+    "rejectedOrAmbiguousDerivationCount": 10,
+    "session": {
+      "end": "16:00",
+      "flatBeforeCloseMinutes": 5,
+      "name": "RTH",
+      "sessions": [
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-22T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-22T19:55:00.000Z",
+          "id": "2026-06-22",
+          "lastBarTime": "2026-06-22T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-23T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-23T19:55:00.000Z",
+          "id": "2026-06-23",
+          "lastBarTime": "2026-06-23T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-24T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-24T19:55:00.000Z",
+          "id": "2026-06-24",
+          "lastBarTime": "2026-06-24T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-25T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-25T19:55:00.000Z",
+          "id": "2026-06-25",
+          "lastBarTime": "2026-06-25T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-26T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-26T19:55:00.000Z",
+          "id": "2026-06-26",
+          "lastBarTime": "2026-06-26T19:55:00.000Z"
+        }
+      ],
+      "start": "09:30",
+      "timezone": "America/New_York"
+    },
+    "signalCounts": {
+      "bearish_bos": 5,
+      "bullish_bos": 5,
+      "bullish_liquidity_zone_touch_entry": 5
+    },
+    "symbol": {
+      "assetClass": "equity_index_futures",
+      "root": "ES",
+      "ticker": "CME_MINI:ES1!"
+    },
+    "zoneConfirmationCounts": {
+      "reclaim": 0,
+      "touch": 5
+    }
+  },
+  "reproduction": {
+    "datasetPath": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+    "reportCommand": "uv run python -m evaluator.nautilus_evaluator.luxalgo_report datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28 --run-registry runs/luxalgo-ict-smc-es-rth-5m",
+    "runRegistryPath": "runs/luxalgo-ict-smc-es-rth-5m",
+    "searchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json"
+  },
+  "search": {
+    "actualTradeCount": 8,
+    "candidateTradeCounts": [
+      {
+        "candidateId": "candidate-1",
+        "strategyId": "luxalgo-ict-smc-long-1",
+        "totalTradeCount": 16,
+        "tradeComparison": {
+          "actual": 16,
+          "status": "below_threshold",
+          "threshold": 30
+        }
+      },
+      {
+        "candidateId": "candidate-2",
+        "strategyId": "luxalgo-ict-smc-long-2",
+        "totalTradeCount": 12,
+        "tradeComparison": {
+          "actual": 12,
+          "status": "below_threshold",
+          "threshold": 30
+        }
+      },
+      {
+        "candidateId": "candidate-3",
+        "strategyId": "luxalgo-ict-smc-long-3",
+        "totalTradeCount": 12,
+        "tradeComparison": {
+          "actual": 12,
+          "status": "below_threshold",
+          "threshold": 30
+        }
+      },
+      {
+        "candidateId": "candidate-4",
+        "strategyId": "luxalgo-ict-smc-long-4",
+        "totalTradeCount": 8,
+        "tradeComparison": {
+          "actual": 8,
+          "status": "below_threshold",
+          "threshold": 30
+        }
+      }
+    ],
+    "comparisonStatus": "smoke-only",
+    "costModel": {
+      "fixedFee": 2.5,
+      "slippageTicks": 1,
+      "tickSize": 0.25
+    },
+    "evaluatedCandidateCount": 4,
+    "fitnessConstraints": {
+      "maxCostToGrossRatio": null,
+      "maxDrawdown": null,
+      "maxSlippageCosts": null,
+      "minProfitableWindowRatio": null,
+      "minProfitableWindows": 0,
+      "minTrades": 1
+    },
+    "generatedCandidateCount": 4,
+    "perWindowResults": [
+      {
+        "barCount": 78,
+        "endSessionDate": "2026-06-23",
+        "netPnl": 5950,
+        "sessionCount": 1,
+        "startSessionDate": "2026-06-23",
+        "tradeCount": 2,
+        "windowId": "wf-1"
+      },
+      {
+        "barCount": 78,
+        "endSessionDate": "2026-06-24",
+        "netPnl": 5950,
+        "sessionCount": 1,
+        "startSessionDate": "2026-06-24",
+        "tradeCount": 2,
+        "windowId": "wf-2"
+      },
+      {
+        "barCount": 78,
+        "endSessionDate": "2026-06-25",
+        "netPnl": 5950,
+        "sessionCount": 1,
+        "startSessionDate": "2026-06-25",
+        "tradeCount": 2,
+        "windowId": "wf-3"
+      },
+      {
+        "barCount": 78,
+        "endSessionDate": "2026-06-26",
+        "netPnl": 5950,
+        "sessionCount": 1,
+        "startSessionDate": "2026-06-26",
+        "tradeCount": 2,
+        "windowId": "wf-4"
+      }
+    ],
+    "recordType": "Nautilus Validation Search",
+    "rejectedCandidateCount": 0,
+    "reproducibilityInputs": {
+      "costModel": {
+        "fixedFee": 2.5,
+        "slippageTicks": 1,
+        "tickSize": 0.25
+      },
+      "datasetSnapshot": "dataset",
+      "fitnessConstraints": {
+        "maxCostToGrossRatio": null,
+        "maxDrawdown": null,
+        "maxSlippageCosts": null,
+        "minProfitableWindowRatio": null,
+        "minProfitableWindows": 0,
+        "minTrades": 1
+      },
+      "generatedCandidatesHash": "abf520448cdd9e34098405df85f932a35f9e30e17507476a3d64067755da0cec",
+      "optimizerConfig": {
+        "maxCandidates": 4,
+        "method": "deterministic",
+        "seed": 0
+      },
+      "sampler": {
+        "name": "none",
+        "seed": 0
+      },
+      "trialsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "walkForward": {
+        "scoringSessions": 1,
+        "stepSessions": 1,
+        "trainingSessions": 1
+      }
+    },
+    "runRegistryRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/winning-run/run.json",
+    "searchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json",
+    "sessionWindows": [
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-23T19:55:00+00:00",
+          "endIndex": 155,
+          "endSessionDate": "2026-06-23",
+          "sessionCount": 1,
+          "start": "2026-06-23T13:30:00+00:00",
+          "startIndex": 78,
+          "startSessionDate": "2026-06-23"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-22T19:55:00+00:00",
+          "endIndex": 77,
+          "endSessionDate": "2026-06-22",
+          "sessionCount": 1,
+          "start": "2026-06-22T13:30:00+00:00",
+          "startIndex": 0,
+          "startSessionDate": "2026-06-22"
+        },
+        "windowId": "wf-1"
+      },
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-24T19:55:00+00:00",
+          "endIndex": 233,
+          "endSessionDate": "2026-06-24",
+          "sessionCount": 1,
+          "start": "2026-06-24T13:30:00+00:00",
+          "startIndex": 156,
+          "startSessionDate": "2026-06-24"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-23T19:55:00+00:00",
+          "endIndex": 155,
+          "endSessionDate": "2026-06-23",
+          "sessionCount": 1,
+          "start": "2026-06-23T13:30:00+00:00",
+          "startIndex": 78,
+          "startSessionDate": "2026-06-23"
+        },
+        "windowId": "wf-2"
+      },
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-25T19:55:00+00:00",
+          "endIndex": 311,
+          "endSessionDate": "2026-06-25",
+          "sessionCount": 1,
+          "start": "2026-06-25T13:30:00+00:00",
+          "startIndex": 234,
+          "startSessionDate": "2026-06-25"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-24T19:55:00+00:00",
+          "endIndex": 233,
+          "endSessionDate": "2026-06-24",
+          "sessionCount": 1,
+          "start": "2026-06-24T13:30:00+00:00",
+          "startIndex": 156,
+          "startSessionDate": "2026-06-24"
+        },
+        "windowId": "wf-3"
+      },
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-26T19:55:00+00:00",
+          "endIndex": 389,
+          "endSessionDate": "2026-06-26",
+          "sessionCount": 1,
+          "start": "2026-06-26T13:30:00+00:00",
+          "startIndex": 312,
+          "startSessionDate": "2026-06-26"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-25T19:55:00+00:00",
+          "endIndex": 311,
+          "endSessionDate": "2026-06-25",
+          "sessionCount": 1,
+          "start": "2026-06-25T13:30:00+00:00",
+          "startIndex": 234,
+          "startSessionDate": "2026-06-25"
+        },
+        "windowId": "wf-4"
+      }
+    ],
+    "status": "completed",
+    "strategySpecOrSearchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json",
+    "survivingCandidateCount": 1,
+    "tradeComparisonThreshold": 30,
+    "walkForward": {
+      "config": {
+        "scoringSessions": 1,
+        "stepSessions": 1,
+        "trainingSessions": 1
+      }
+    },
+    "winningRun": {
+      "artifacts": {
+        "ordersByWindow": "winning-run/orders-by-window.json",
+        "runRecord": "winning-run/run.json"
+      },
+      "candidateId": "training-window-selection",
+      "fitness": {
+        "rankingInputs": {
+          "costToGrossRatio": 0.1736111111111111,
+          "grossPnl": 28800,
+          "maxDrawdown": 0,
+          "netPnl": 23800,
+          "outOfSampleSharpe": 5950.0,
+          "profitableWindowRatio": 1.0,
+          "profitableWindows": 4,
+          "slippageCosts": 1000,
+          "totalCosts": 5000,
+          "tradeCount": 8
+        },
+        "rejectionReasons": [],
+        "score": 5950.0,
+        "survivalChecks": {
+          "minProfitableWindows": {
+            "actual": 4,
+            "passed": true,
+            "required": 0
+          },
+          "minTrades": {
+            "actual": 8,
+            "passed": true,
+            "required": 1
+          }
+        },
+        "survived": true
+      },
+      "objectiveValue": 5950.0,
+      "provenance": {
+        "recordType": "Nautilus Walk-Forward Validation",
+        "requiredNautilusProvenance": true
+      },
+      "sourceRunRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-1-walk-forward-9f58394604f7/run.json",
+      "strategyId": "walk-forward-selected-candidates",
+      "strategySpec": {
+        "candidateStrategySpecs": [
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 24,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "exits_maxBarsInTrade": 24,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "parameters_confirmationMode": "touch",
+              "parameters_liquidityZoneType": "order_block",
+              "parameters_maxBarsAfterStructureEvent": 6,
+              "parameters_zonePreference": "nearest-any",
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 8,
+              "templateChoiceIndex": 1,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 8,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-1",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          },
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 48,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "exits_maxBarsInTrade": 48,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "parameters_confirmationMode": "touch",
+              "parameters_liquidityZoneType": "order_block",
+              "parameters_maxBarsAfterStructureEvent": 6,
+              "parameters_zonePreference": "nearest-any",
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 8,
+              "templateChoiceIndex": 2,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 8,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-2",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          },
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 24,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "exits_maxBarsInTrade": 24,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "parameters_confirmationMode": "touch",
+              "parameters_liquidityZoneType": "order_block",
+              "parameters_maxBarsAfterStructureEvent": 6,
+              "parameters_zonePreference": "nearest-any",
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 12,
+              "templateChoiceIndex": 3,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 12,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-3",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          },
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 48,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "exits_maxBarsInTrade": 48,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "parameters_confirmationMode": "touch",
+              "parameters_liquidityZoneType": "order_block",
+              "parameters_maxBarsAfterStructureEvent": 6,
+              "parameters_zonePreference": "nearest-any",
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 12,
+              "templateChoiceIndex": 4,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 12,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-4",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          }
+        ],
+        "selectionStrategy": "training-window-candidate-selection"
+      },
+      "totalTradeCount": 8,
+      "tradeComparison": {
+        "actual": 8,
+        "status": "below_threshold",
+        "threshold": 30
+      },
+      "trialNumber": null,
+      "trialParameters": {
+        "selectedCandidates": [
+          {
+            "candidateId": "candidate-4",
+            "strategyId": "luxalgo-ict-smc-long-4",
+            "windowId": "wf-1"
+          },
+          {
+            "candidateId": "candidate-4",
+            "strategyId": "luxalgo-ict-smc-long-4",
+            "windowId": "wf-2"
+          },
+          {
+            "candidateId": "candidate-4",
+            "strategyId": "luxalgo-ict-smc-long-4",
+            "windowId": "wf-3"
+          },
+          {
+            "candidateId": "candidate-4",
+            "strategyId": "luxalgo-ict-smc-long-4",
+            "windowId": "wf-4"
+          }
+        ]
+      }
+    }
+  }
+}

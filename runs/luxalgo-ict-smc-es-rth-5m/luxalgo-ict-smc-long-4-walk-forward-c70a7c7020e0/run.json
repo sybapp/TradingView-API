@@ -1,0 +1,1070 @@
+{
+  "artifacts": {
+    "ordersByWindow": "orders-by-window.json"
+  },
+  "authoritative": true,
+  "costModel": {
+    "fixedFee": 2.5,
+    "slippageTicks": 1,
+    "tickSize": 0.25
+  },
+  "dataset": {
+    "bar": {
+      "interval": "5m",
+      "priceScale": 100,
+      "volumeUnit": "contracts"
+    },
+    "collectedAt": "2026-06-28T12:00:00.000Z",
+    "datasetId": "es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+    "path": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+    "schemaVersion": 1,
+    "session": {
+      "end": "16:00",
+      "flatBeforeCloseMinutes": 5,
+      "name": "RTH",
+      "sessions": [
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-22T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-22T19:55:00.000Z",
+          "id": "2026-06-22",
+          "lastBarTime": "2026-06-22T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-23T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-23T19:55:00.000Z",
+          "id": "2026-06-23",
+          "lastBarTime": "2026-06-23T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-24T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-24T19:55:00.000Z",
+          "id": "2026-06-24",
+          "lastBarTime": "2026-06-24T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-25T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-25T19:55:00.000Z",
+          "id": "2026-06-25",
+          "lastBarTime": "2026-06-25T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-26T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-26T19:55:00.000Z",
+          "id": "2026-06-26",
+          "lastBarTime": "2026-06-26T19:55:00.000Z"
+        }
+      ],
+      "start": "09:30",
+      "timezone": "America/New_York"
+    },
+    "source": "tradingview",
+    "symbol": {
+      "assetClass": "equity_index_futures",
+      "root": "ES",
+      "ticker": "CME_MINI:ES1!"
+    }
+  },
+  "evaluatorVersion": "strategy-replay-v1",
+  "finalRankingInputs": {
+    "costToGrossRatio": 0.1736111111111111,
+    "grossPnl": 28800,
+    "maxDrawdown": 0,
+    "netPnl": 23800,
+    "outOfSampleSharpe": 5950.0,
+    "profitableWindowRatio": 1.0,
+    "profitableWindows": 4,
+    "slippageCosts": 1000,
+    "totalCosts": 5000,
+    "tradeCount": 8
+  },
+  "fitness": {
+    "rankingInputs": {
+      "costToGrossRatio": 0.1736111111111111,
+      "grossPnl": 28800,
+      "maxDrawdown": 0,
+      "netPnl": 23800,
+      "outOfSampleSharpe": 5950.0,
+      "profitableWindowRatio": 1.0,
+      "profitableWindows": 4,
+      "slippageCosts": 1000,
+      "totalCosts": 5000,
+      "tradeCount": 8
+    },
+    "rejectionReasons": [],
+    "score": 5950.0,
+    "survivalChecks": {
+      "minProfitableWindows": {
+        "actual": 4,
+        "passed": true,
+        "required": 0
+      },
+      "minTrades": {
+        "actual": 8,
+        "passed": true,
+        "required": 1
+      }
+    },
+    "survived": true
+  },
+  "perWindowResults": [
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/scoring-wf-1-account.csv",
+        "nautilusOrderFills": "nautilus-reports/scoring-wf-1-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/scoring-wf-1-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "scoring:wf-1"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-23",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-23",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-1"
+    },
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/scoring-wf-2-account.csv",
+        "nautilusOrderFills": "nautilus-reports/scoring-wf-2-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/scoring-wf-2-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "scoring:wf-2"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-24",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-24",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-2"
+    },
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/scoring-wf-3-account.csv",
+        "nautilusOrderFills": "nautilus-reports/scoring-wf-3-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/scoring-wf-3-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "scoring:wf-3"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-25",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-25",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-3"
+    },
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/scoring-wf-4-account.csv",
+        "nautilusOrderFills": "nautilus-reports/scoring-wf-4-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/scoring-wf-4-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "scoring:wf-4"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-26",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-26",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-4"
+    }
+  ],
+  "recordType": "Nautilus Walk-Forward Validation",
+  "runId": "luxalgo-ict-smc-long-4-walk-forward-c70a7c7020e0",
+  "searchConfiguration": {
+    "description": "No optimizer is run in this diagnostic slice; the same fixed Strategy Spec is validated separately on training and scoring windows.",
+    "type": "fixed-strategy-spec-diagnostic"
+  },
+  "strategySpec": {
+    "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+    "entryRules": [
+      {
+        "feature": {
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "name": "bullish_bos",
+          "type": "signal"
+        },
+        "side": "long",
+        "type": "feature_equals",
+        "value": true
+      },
+      {
+        "feature": {
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "name": "bullish_liquidity_zone_touch_entry",
+          "type": "signal"
+        },
+        "side": "long",
+        "type": "feature_equals",
+        "value": true
+      }
+    ],
+    "exits": {
+      "maxBarsInTrade": 48,
+      "reverseSignalRules": [
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "name": "bearish_bos",
+            "type": "signal"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        }
+      ]
+    },
+    "parameters": {
+      "confirmationMode": "touch",
+      "entryRules_0_feature_name": "bullish_bos",
+      "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+      "exits_maxBarsInTrade": 48,
+      "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+      "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+      "liquidityZoneType": "order_block",
+      "maxBarsAfterStructureEvent": 6,
+      "parameters_confirmationMode": "touch",
+      "parameters_liquidityZoneType": "order_block",
+      "parameters_maxBarsAfterStructureEvent": 6,
+      "parameters_zonePreference": "nearest-any",
+      "riskControls_cooldownBarsAfterExit": 0,
+      "riskControls_stopLossTicks": 12,
+      "templateChoiceIndex": 4,
+      "templateId": "luxalgo-ict-smc-long",
+      "zonePreference": "nearest-any"
+    },
+    "riskControls": {
+      "cooldownBarsAfterExit": 0,
+      "flatBeforeCloseMinutes": 5,
+      "intradayFlat": true,
+      "stopLossTicks": 12,
+      "takeProfitTicks": 100
+    },
+    "schemaVersion": 1,
+    "sizing": {
+      "quantity": 1,
+      "type": "fixed"
+    },
+    "strategyId": "luxalgo-ict-smc-long-4",
+    "tunableParameters": {
+      "confirmationModes": [
+        "touch"
+      ],
+      "cooldownBarsAfterExit": [
+        0
+      ],
+      "eventTypes": [
+        "bos"
+      ],
+      "maxBarsAfterStructureEvent": [
+        6
+      ],
+      "maxBarsInTrade": [
+        24,
+        48
+      ],
+      "stopLossTicks": [
+        8,
+        12
+      ],
+      "zonePreferences": [
+        "nearest-any"
+      ],
+      "zoneTypes": [
+        "order_block"
+      ]
+    }
+  },
+  "trainingWindowResults": [
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/training-wf-1-account.csv",
+        "nautilusOrderFills": "nautilus-reports/training-wf-1-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/training-wf-1-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "training:wf-1"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-22",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-22",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-1"
+    },
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/training-wf-2-account.csv",
+        "nautilusOrderFills": "nautilus-reports/training-wf-2-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/training-wf-2-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "training:wf-2"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-23",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-23",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-2"
+    },
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/training-wf-3-account.csv",
+        "nautilusOrderFills": "nautilus-reports/training-wf-3-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/training-wf-3-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "training:wf-3"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-24",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-24",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-3"
+    },
+    {
+      "artifacts": {
+        "nautilusAccount": "nautilus-reports/training-wf-4-account.csv",
+        "nautilusOrderFills": "nautilus-reports/training-wf-4-order-fills.csv",
+        "nautilusPositions": "nautilus-reports/training-wf-4-positions.csv",
+        "ordersByWindow": "orders-by-window.json",
+        "ordersByWindowKey": "training:wf-4"
+      },
+      "barCount": 78,
+      "barType": {
+        "aggregation": "5m",
+        "priceType": "LAST",
+        "source": "EXTERNAL",
+        "value": "ESU6.GLBX-5-MINUTE-LAST-EXTERNAL"
+      },
+      "costConfiguration": {
+        "nautilusExecution": {
+          "feeModel": {
+            "class": "PerContractFeeModel",
+            "commission": "2.5 USD"
+          },
+          "fillModel": {
+            "class": "OneTickSlippageFillModel",
+            "slippageTicks": 1
+          }
+        },
+        "requested": {
+          "fixed_fee": 2.5,
+          "slippage_ticks": 1,
+          "tick_size": 0.25
+        }
+      },
+      "endSessionDate": "2026-06-25",
+      "environment": {
+        "argv": [
+          "/Users/sybapp/WorkSpaces/TradingView-API/evaluator/nautilus_evaluator/luxalgo_report.py",
+          "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+          "--run-registry",
+          "runs/luxalgo-ict-smc-es-rth-5m",
+          "--report",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.md",
+          "--summary",
+          "reports/es-rth-5m-luxalgo-ict-smc-validation.json"
+        ],
+        "cwd": "/Users/sybapp/WorkSpaces/TradingView-API",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "pythonExecutable": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/bin/python3",
+        "pythonVersion": "3.12.12"
+      },
+      "grossPnl": 7200,
+      "instrument": {
+        "expiryMonth": 9,
+        "expiryYear": 2026,
+        "instrumentId": "ESU6.GLBX",
+        "priceIncrement": "0.25",
+        "pricePrecision": 2,
+        "provider": "nautilus_trader.test_kit.providers.TestInstrumentProvider.es_future",
+        "rawSymbol": "ESU6"
+      },
+      "maxDrawdown": 0,
+      "nautilusTrader": {
+        "engine": "BacktestEngine",
+        "moduleFile": "/Users/sybapp/WorkSpaces/TradingView-API/.venv/lib/python3.12/site-packages/nautilus_trader/__init__.py",
+        "package": "nautilus_trader",
+        "runtimeImportFromThirdPartyReference": false,
+        "version": "1.229.0"
+      },
+      "netPnl": 5950,
+      "orderCount": 4,
+      "resultSummary": {
+        "engine": "nautilus-trader-backtest-engine",
+        "grossPnl": 7200,
+        "netPnl": 5950,
+        "orderCount": 4,
+        "positionQuantity": 0,
+        "totalCosts": 1250,
+        "tradeCount": 2
+      },
+      "sessionCount": 1,
+      "startSessionDate": "2026-06-25",
+      "totalCosts": 1250,
+      "tradeCount": 2,
+      "venue": {
+        "accountType": "MARGIN",
+        "baseCurrency": "USD",
+        "name": "GLBX",
+        "omsType": "NETTING",
+        "startingBalances": [
+          "1000000 USD"
+        ]
+      },
+      "windowId": "wf-4"
+    }
+  ],
+  "trainingWindowSelection": [],
+  "walkForward": {
+    "config": {
+      "scoringSessions": 1,
+      "stepSessions": 1,
+      "trainingSessions": 1
+    },
+    "windows": [
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-23T19:55:00+00:00",
+          "endIndex": 155,
+          "endSessionDate": "2026-06-23",
+          "sessionCount": 1,
+          "start": "2026-06-23T13:30:00+00:00",
+          "startIndex": 78,
+          "startSessionDate": "2026-06-23"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-22T19:55:00+00:00",
+          "endIndex": 77,
+          "endSessionDate": "2026-06-22",
+          "sessionCount": 1,
+          "start": "2026-06-22T13:30:00+00:00",
+          "startIndex": 0,
+          "startSessionDate": "2026-06-22"
+        },
+        "windowId": "wf-1"
+      },
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-24T19:55:00+00:00",
+          "endIndex": 233,
+          "endSessionDate": "2026-06-24",
+          "sessionCount": 1,
+          "start": "2026-06-24T13:30:00+00:00",
+          "startIndex": 156,
+          "startSessionDate": "2026-06-24"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-23T19:55:00+00:00",
+          "endIndex": 155,
+          "endSessionDate": "2026-06-23",
+          "sessionCount": 1,
+          "start": "2026-06-23T13:30:00+00:00",
+          "startIndex": 78,
+          "startSessionDate": "2026-06-23"
+        },
+        "windowId": "wf-2"
+      },
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-25T19:55:00+00:00",
+          "endIndex": 311,
+          "endSessionDate": "2026-06-25",
+          "sessionCount": 1,
+          "start": "2026-06-25T13:30:00+00:00",
+          "startIndex": 234,
+          "startSessionDate": "2026-06-25"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-24T19:55:00+00:00",
+          "endIndex": 233,
+          "endSessionDate": "2026-06-24",
+          "sessionCount": 1,
+          "start": "2026-06-24T13:30:00+00:00",
+          "startIndex": 156,
+          "startSessionDate": "2026-06-24"
+        },
+        "windowId": "wf-3"
+      },
+      {
+        "scoring": {
+          "barCount": 78,
+          "end": "2026-06-26T19:55:00+00:00",
+          "endIndex": 389,
+          "endSessionDate": "2026-06-26",
+          "sessionCount": 1,
+          "start": "2026-06-26T13:30:00+00:00",
+          "startIndex": 312,
+          "startSessionDate": "2026-06-26"
+        },
+        "training": {
+          "barCount": 78,
+          "end": "2026-06-25T19:55:00+00:00",
+          "endIndex": 311,
+          "endSessionDate": "2026-06-25",
+          "sessionCount": 1,
+          "start": "2026-06-25T13:30:00+00:00",
+          "startIndex": 234,
+          "startSessionDate": "2026-06-25"
+        },
+        "windowId": "wf-4"
+      }
+    ]
+  }
+}
