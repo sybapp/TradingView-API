@@ -54,6 +54,7 @@ const LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE = 'luxalgo-structure-event-direct
 const LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION = '1';
 const LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_RULE = 'luxalgo-liquidity-zone-entry';
 const LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_VERSION = '1';
+const DERIVATION_DIAGNOSTICS_FILE = 'derivation-diagnostics.json';
 const LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST = [
   {
     id: 'PUB;6daafb2cabe6419d98ae25229d2327f8',
@@ -366,6 +367,55 @@ function signalNameForLiquidityZoneEntry(confirmationMode) {
   return `bullish_liquidity_zone_${confirmationMode}_entry`;
 }
 
+function emptyDerivationRuleDiagnostics({ rule, version }) {
+  return {
+    rule,
+    version,
+    counts: {},
+    warnings: [],
+    examples: [],
+  };
+}
+
+function incrementDiagnosticCount(diagnostics, countName) {
+  diagnostics.counts[countName] = (diagnostics.counts[countName] || 0) + 1;
+}
+
+function addDiagnosticExample(diagnostics, example) {
+  if (diagnostics.examples.length >= 5) return;
+  diagnostics.examples.push(example);
+}
+
+function warnIfCount(diagnostics, countName, message) {
+  if ((diagnostics.counts[countName] || 0) > 0) {
+    diagnostics.warnings.push(message(diagnostics.counts[countName]));
+  }
+}
+
+function compactRuleDiagnostics(diagnostics) {
+  return {
+    ...diagnostics,
+    counts: Object.fromEntries(
+      Object.entries(diagnostics.counts).filter(([, value]) => value > 0),
+    ),
+  };
+}
+
+function createDerivationDiagnostics(rules) {
+  const includedRules = rules.filter((diagnostics) => (
+    Object.values(diagnostics.counts).some((value) => value > 0)
+    || diagnostics.warnings.length > 0
+    || diagnostics.examples.length > 0
+  ));
+
+  if (includedRules.length === 0) return undefined;
+
+  return {
+    schemaVersion: 1,
+    rules: includedRules.map(compactRuleDiagnostics),
+  };
+}
+
 function normalizeDerivedSignalFeature({
   indicator,
   eventTime,
@@ -406,8 +456,13 @@ function normalizeDerivedSignalFeature({
 }
 
 function deriveLuxAlgoStructureSignals({ indicator, features, startIndex }) {
+  const diagnostics = emptyDerivationRuleDiagnostics({
+    rule: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE,
+    version: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION,
+  });
+
   if (indicator.id !== LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id) {
-    return { features: [], nextIndex: startIndex };
+    return { features: [], nextIndex: startIndex, diagnostics };
   }
 
   let index = startIndex;
@@ -415,9 +470,27 @@ function deriveLuxAlgoStructureSignals({ indicator, features, startIndex }) {
 
   features.forEach((feature) => {
     if (feature.type !== 'label' || !isLuxAlgoStructureEventName(feature.name)) return;
+    incrementDiagnosticCount(diagnostics, 'sourceFeatures');
 
     const directionEvidence = deriveDirectionEvidenceFromLabelStyle(feature.value?.style);
-    if (!directionEvidence) return;
+    if (!directionEvidence) {
+      incrementDiagnosticCount(diagnostics, 'unresolvedDirection');
+      addDiagnosticExample(diagnostics, {
+        kind: 'unresolved_direction',
+        indicatorId: feature.indicatorId,
+        sourceFeatureId: feature.id,
+        featureType: feature.type,
+        featureName: feature.name,
+        eventTime: feature.eventTime,
+        reason: 'unsupported label style',
+        evidence: {
+          text: feature.value?.text,
+          style: feature.value?.style,
+          graphicId: feature.value?.graphicId,
+        },
+      });
+      return;
+    }
 
     derivedFeatures.push(normalizeDerivedSignalFeature({
       indicator,
@@ -428,12 +501,20 @@ function deriveLuxAlgoStructureSignals({ indicator, features, startIndex }) {
       sourceFeatureId: feature.id,
       directionEvidence,
     }));
+    incrementDiagnosticCount(diagnostics, 'derivedFeatures');
     index += 1;
   });
+
+  warnIfCount(
+    diagnostics,
+    'unresolvedDirection',
+    (count) => `${count} structure event label could not be converted to a directional signal.`,
+  );
 
   return {
     features: derivedFeatures,
     nextIndex: index,
+    diagnostics,
   };
 }
 
@@ -479,8 +560,8 @@ function bullishLiquidityZone(feature) {
   const combined = `${name} ${text}`;
   if (!combined.includes('bull')) return null;
 
-  const top = Number(feature.value?.top);
-  const bottom = Number(feature.value?.bottom);
+  const top = feature.value?.top;
+  const bottom = feature.value?.bottom;
   if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
 
   return {
@@ -489,6 +570,37 @@ function bullishLiquidityZone(feature) {
     direction: 'bullish',
     top: Math.max(top, bottom),
     bottom: Math.min(top, bottom),
+  };
+}
+
+function diagnoseBullishLiquidityZone(feature) {
+  if (feature.type !== 'box') return null;
+
+  const kind = liquidityZoneKind(feature);
+  if (!kind) return null;
+
+  const name = String(feature.name || '').toLowerCase();
+  const text = String(feature.value?.text || '').toLowerCase();
+  const combined = `${name} ${text}`;
+  if (!combined.includes('bull')) return null;
+
+  const top = feature.value?.top;
+  const bottom = feature.value?.bottom;
+  if (Number.isFinite(top) && Number.isFinite(bottom)) return null;
+
+  return {
+    kind: 'invalid_zone_geometry',
+    indicatorId: feature.indicatorId,
+    sourceFeatureId: feature.id,
+    featureType: feature.type,
+    featureName: feature.name,
+    eventTime: feature.eventTime,
+    reason: 'missing finite top or bottom',
+    evidence: {
+      top: feature.value?.top,
+      bottom: feature.value?.bottom,
+      graphicId: feature.value?.graphicId,
+    },
   };
 }
 
@@ -615,8 +727,13 @@ function deriveLuxAlgoLiquidityZoneEntrySignals({
   startIndex,
 }) {
   const entryOptions = luxAlgoLiquidityZoneEntryOptions(options);
+  const diagnostics = emptyDerivationRuleDiagnostics({
+    rule: LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_RULE,
+    version: LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_VERSION,
+  });
+
   if (!entryOptions || indicator.id !== LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id) {
-    return { features: [], nextIndex: startIndex };
+    return { features: [], nextIndex: startIndex, diagnostics };
   }
 
   let index = startIndex;
@@ -627,13 +744,39 @@ function deriveLuxAlgoLiquidityZoneEntrySignals({
     .map(bullishStructureEvent)
     .filter(Boolean)
     .sort((left, right) => Date.parse(left.feature.availabilityTime) - Date.parse(right.feature.availabilityTime));
+  diagnostics.counts.sourceStructureEvents = structures.length;
+
+  features
+    .map(diagnoseBullishLiquidityZone)
+    .filter(Boolean)
+    .forEach((example) => {
+      incrementDiagnosticCount(diagnostics, 'invalidZoneGeometry');
+      addDiagnosticExample(diagnostics, example);
+    });
+
   const zones = features
     .map(bullishLiquidityZone)
     .filter(Boolean);
+  diagnostics.counts.sourceZones = zones.length;
 
   structures.forEach((structureEvent) => {
     const startBarIndex = indexes.get(structureEvent.feature.availabilityTime);
-    if (startBarIndex === undefined) return;
+    if (startBarIndex === undefined) {
+      incrementDiagnosticCount(diagnostics, 'missingProvenance');
+      addDiagnosticExample(diagnostics, {
+        kind: 'missing_provenance',
+        indicatorId: structureEvent.feature.indicatorId,
+        sourceFeatureId: structureEvent.feature.id,
+        featureType: structureEvent.feature.type,
+        featureName: structureEvent.feature.name,
+        eventTime: structureEvent.feature.eventTime,
+        reason: 'structure event availability time does not match a collected bar',
+        evidence: {
+          availabilityTime: structureEvent.feature.availabilityTime,
+        },
+      });
+      return;
+    }
 
     const lastBarIndex = Math.min(
       bars.length - 1,
@@ -671,15 +814,28 @@ function deriveLuxAlgoLiquidityZoneEntrySignals({
         confirmationMode: entryOptions.confirmationMode,
         index,
       }));
+      incrementDiagnosticCount(diagnostics, 'derivedFeatures');
       index += 1;
       usedZoneFeatureIds.add(selectableZone.feature.id);
       break;
     }
   });
 
+  warnIfCount(
+    diagnostics,
+    'invalidZoneGeometry',
+    (count) => `${count} liquidity zone could not be used because its geometry was invalid.`,
+  );
+  warnIfCount(
+    diagnostics,
+    'missingProvenance',
+    (count) => `${count} structure event could not be evaluated because required provenance was missing.`,
+  );
+
   return {
     features: derivedFeatures,
     nextIndex: index,
+    diagnostics,
   };
 }
 
@@ -852,6 +1008,7 @@ function normalizeGraphicFeatures({
   });
   features.push(...derivedSignalResult.features);
   index = derivedSignalResult.nextIndex;
+  const diagnostics = [derivedSignalResult.diagnostics];
 
   const liquidityZoneEntryResult = deriveLuxAlgoLiquidityZoneEntrySignals({
     indicator,
@@ -862,8 +1019,9 @@ function normalizeGraphicFeatures({
   });
   features.push(...liquidityZoneEntryResult.features);
   index = liquidityZoneEntryResult.nextIndex;
+  diagnostics.push(liquidityZoneEntryResult.diagnostics);
 
-  return { features, nextIndex: index };
+  return { features, nextIndex: index, diagnostics };
 }
 
 function indicatorStudiesToFeatures({
@@ -875,6 +1033,7 @@ function indicatorStudiesToFeatures({
   const byId = allowlistById(allowlist);
   let index = 0;
   const features = [];
+  const diagnostics = [];
 
   studies.forEach((study) => {
     const indicator = byId.get(normalizeStudyId(study));
@@ -898,13 +1057,20 @@ function indicatorStudiesToFeatures({
     });
     features.push(...graphicResult.features);
     index = graphicResult.nextIndex;
+    diagnostics.push(...graphicResult.diagnostics);
   });
 
-  return features.sort((left, right) => (
+  const sortedFeatures = features.sort((left, right) => (
     Date.parse(left.availabilityTime) - Date.parse(right.availabilityTime)
     || Date.parse(left.eventTime) - Date.parse(right.eventTime)
     || left.id.localeCompare(right.id)
   ));
+
+  Object.defineProperty(sortedFeatures, 'derivationDiagnostics', {
+    value: createDerivationDiagnostics(diagnostics),
+    enumerable: false,
+  });
+  return sortedFeatures;
 }
 
 function defaultResolveIndicator(indicator) {
@@ -997,6 +1163,12 @@ function buildEsRthDataset({
     end: defaults.sessionEnd,
     flatBeforeCloseMinutes: defaults.flatBeforeCloseMinutes,
   };
+  const features = indicatorStudiesToFeatures({
+    studies: indicatorStudies,
+    bars,
+    allowlist: indicatorAllowlist,
+    candidateSignalDerivation,
+  });
 
   return {
     manifest: {
@@ -1030,12 +1202,8 @@ function buildEsRthDataset({
       ...(collection ? { collection: { ...collection } } : {}),
     },
     bars,
-    features: indicatorStudiesToFeatures({
-      studies: indicatorStudies,
-      bars,
-      allowlist: indicatorAllowlist,
-      candidateSignalDerivation,
-    }),
+    features,
+    derivationDiagnostics: features.derivationDiagnostics,
   };
 }
 
@@ -1062,6 +1230,12 @@ function writeVersionedDatasetSync(outputPath, dataset) {
   writeJsonSync(path.join(outputPath, 'manifest.json'), dataset.manifest);
   writeJsonSync(path.join(outputPath, 'bars.json'), dataset.bars);
   writeJsonSync(path.join(outputPath, 'features.json'), dataset.features);
+  const derivationDiagnosticsPath = path.join(outputPath, DERIVATION_DIAGNOSTICS_FILE);
+  if (dataset.derivationDiagnostics) {
+    writeJsonSync(derivationDiagnosticsPath, dataset.derivationDiagnostics);
+  } else if (fs.existsSync(derivationDiagnosticsPath)) {
+    fs.unlinkSync(derivationDiagnosticsPath);
+  }
 }
 
 function waitForChartBars(chart, { minBars, timeoutMs }) {

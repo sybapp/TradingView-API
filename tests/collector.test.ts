@@ -753,6 +753,219 @@ describe('TradingView collector', () => {
     expect(derivedSignals.map((feature) => feature.name)).not.toContain('bearish_mss');
   });
 
+  it('records derivation diagnostics without writing diagnostics-only features', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-derivation-diagnostics-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 851,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 852,
+                x: 1,
+                y: 5503.25,
+                text: 'MSS',
+                style: 'label_left',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 853,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: null,
+                x2: 2,
+                y2: 5500.25,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'MSS',
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'bullish_order_block',
+      }),
+    ]));
+    expect(dataset.features).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'diagnostic',
+      }),
+    ]));
+    expect(dataset.derivationDiagnostics).toEqual(expect.objectContaining({
+      schemaVersion: 1,
+      rules: expect.arrayContaining([
+        expect.objectContaining({
+          rule: 'luxalgo-structure-event-direction',
+          version: '1',
+          counts: expect.objectContaining({
+            sourceFeatures: 2,
+            derivedFeatures: 1,
+            unresolvedDirection: 1,
+          }),
+          warnings: expect.arrayContaining([
+            '1 structure event label could not be converted to a directional signal.',
+          ]),
+          examples: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'unresolved_direction',
+              indicatorId: luxAlgoIctSmc.id,
+              sourceFeatureId: expect.stringContaining(`${luxAlgoIctSmc.id}:label:MSS`),
+              featureType: 'label',
+              featureName: 'MSS',
+              eventTime: '2026-06-25T13:35:00.000Z',
+              reason: 'unsupported label style',
+              evidence: expect.objectContaining({
+                style: 'label_left',
+                text: 'MSS',
+                graphicId: 852,
+              }),
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          rule: 'luxalgo-liquidity-zone-entry',
+          version: '1',
+          counts: expect.objectContaining({
+            invalidZoneGeometry: 1,
+          }),
+          warnings: expect.arrayContaining([
+            '1 liquidity zone could not be used because its geometry was invalid.',
+          ]),
+          examples: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'invalid_zone_geometry',
+              indicatorId: luxAlgoIctSmc.id,
+              sourceFeatureId: expect.stringContaining(`${luxAlgoIctSmc.id}:box:bullish_order_block`),
+              featureType: 'box',
+              featureName: 'bullish_order_block',
+              reason: 'missing finite top or bottom',
+              evidence: expect.objectContaining({
+                top: null,
+                bottom: 5500.25,
+                graphicId: 853,
+              }),
+            }),
+          ]),
+        }),
+      ]),
+    }));
+  });
+
+  it('writes and reads derivation diagnostics as a companion artifact', () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-derivation-diagnostics-'));
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-derivation-diagnostics-write-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 861,
+                x: 0,
+                y: 5502.5,
+                text: 'MSS',
+                style: 'label_left',
+                yLoc: 'price',
+                color: 16711680,
+                textColor: 16777215,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    TradingView.collector.writeVersionedDatasetSync(outputPath, dataset);
+
+    expect(JSON.parse(
+      fs.readFileSync(path.join(outputPath, 'derivation-diagnostics.json'), 'utf8'),
+    )).toEqual(dataset.derivationDiagnostics);
+    expect(JSON.parse(fs.readFileSync(path.join(outputPath, 'features.json'), 'utf8'))).toEqual(
+      dataset.features,
+    );
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(dataset);
+  });
+
+  it('removes stale derivation diagnostics when the next dataset has none', () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-stale-derivation-diagnostics-'));
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const datasetWithDiagnostics = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-derivation-diagnostics-stale-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 871,
+                x: 0,
+                y: 5502.5,
+                text: 'MSS',
+                style: 'label_left',
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const datasetWithoutDiagnostics = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'plain-dataset-after-diagnostics-fixture',
+      indicatorAllowlist: [],
+    });
+
+    TradingView.collector.writeVersionedDatasetSync(outputPath, datasetWithDiagnostics);
+    TradingView.collector.writeVersionedDatasetSync(outputPath, datasetWithoutDiagnostics);
+
+    expect(fs.existsSync(path.join(outputPath, 'derivation-diagnostics.json'))).toBe(false);
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(
+      datasetWithoutDiagnostics,
+    );
+  });
+
   it('derives a long entry candidate signal when a bullish structure event confirms a bullish liquidity zone touch', () => {
     const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
     const dataset = TradingView.collector.buildEsRth5mDataset({

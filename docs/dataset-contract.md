@@ -7,6 +7,7 @@ A dataset is a directory containing:
 - `manifest.json`
 - `bars.json`
 - `features.json`
+- optional `derivation-diagnostics.json`
 
 The collector writes this directory. The evaluator reads it. Backtests must not call TradingView live.
 
@@ -122,6 +123,34 @@ When present, `manifest.session.sessions` records the derived RTH session struct
 - `repainting-risk`
 
 Graphics must be represented as typed Structural Features rather than screenshots.
+
+Derived Candidate Signals are strategy-consumable features and are written to
+`features.json` as `type: "signal"` records. Derivation diagnostics are not
+strategy-consumable features and must not be written as diagnostics-only records
+inside `features.json`.
+
+## Feature Derivation Diagnostics
+
+`derivation-diagnostics.json` is an optional companion artifact for feature
+derivation results. Older datasets may omit it.
+
+When present, it contains:
+
+- `schemaVersion`: currently `1`
+- `rules`: derivation rule diagnostics
+
+Each rule diagnostic contains:
+
+- `rule`: derivation rule name
+- `version`: derivation rule version
+- `counts`: aggregate source, derived, and unresolved counts
+- `warnings`: human-readable warnings for non-blocking derivation issues
+- `examples`: representative unresolved examples
+
+The LuxAlgo ICT/SMC derivations record unresolved direction, invalid liquidity
+zone geometry, and missing provenance as diagnostics. These diagnostics do not
+abort dataset writing; they make derivation loss auditable while keeping
+`features.json` limited to structural features and candidate signals.
 
 ## Public API
 
