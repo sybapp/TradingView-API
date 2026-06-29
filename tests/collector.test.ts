@@ -753,6 +753,577 @@ describe('TradingView collector', () => {
     expect(derivedSignals.map((feature) => feature.name)).not.toContain('bearish_mss');
   });
 
+  it('derives a long entry candidate signal when a bullish structure event confirms a bullish liquidity zone touch', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-touch-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 901,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 902,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+
+    const entrySignal = dataset.features.find(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_touch_entry',
+    );
+
+    expect(entrySignal).toEqual(expect.objectContaining({
+      indicatorId: luxAlgoIctSmc.id,
+      type: 'signal',
+      eventTime: '2026-06-25T13:45:00.000Z',
+      availabilityTime: '2026-06-25T13:45:00.000Z',
+      value: true,
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          sourceFeatureIds: [
+            expect.stringContaining(`${luxAlgoIctSmc.id}:label:BOS:2026-06-25T13-30-00-000Z`),
+            expect.stringContaining(`${luxAlgoIctSmc.id}:box:bullish_order_block:2026-06-25T13-35-00-000Z`),
+          ],
+          derivation: expect.objectContaining({
+            rule: 'luxalgo-liquidity-zone-entry',
+            version: '1',
+          }),
+          structureEvent: expect.objectContaining({
+            name: 'BOS',
+            direction: 'bullish',
+            eventTime: '2026-06-25T13:30:00.000Z',
+          }),
+          selectedZone: expect.objectContaining({
+            kind: 'order_block',
+            direction: 'bullish',
+            top: 5500.4,
+            bottom: 5500.1,
+          }),
+          confirmation: expect.objectContaining({
+            mode: 'touch',
+            barTime: '2026-06-25T13:45:00.000Z',
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('derives a long entry candidate signal only after a bullish liquidity zone reclaim', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5502.25,
+          high: 5502.5,
+          low: 5500.25,
+          close: 5500.35,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5500.35,
+          high: 5503,
+          low: 5500.2,
+          close: 5502,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-reclaim-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'reclaim',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 4,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 911,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 912,
+                name: 'bullish_fair_value_gap',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish FVG',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const entrySignals = dataset.features.filter(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_reclaim_entry',
+    );
+
+    expect(entrySignals).toHaveLength(1);
+    expect(entrySignals[0]).toEqual(expect.objectContaining({
+      eventTime: '2026-06-25T13:50:00.000Z',
+      availabilityTime: '2026-06-25T13:50:00.000Z',
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          selectedZone: expect.objectContaining({
+            kind: 'fair_value_gap',
+          }),
+          confirmation: expect.objectContaining({
+            mode: 'reclaim',
+            barTime: '2026-06-25T13:50:00.000Z',
+          }),
+        }),
+      }),
+    }));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('does not derive a liquidity zone entry after the structure event wait expires', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5504,
+          low: 5502.75,
+          close: 5503,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5503,
+          high: 5503.25,
+          low: 5500.25,
+          close: 5502,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-expired-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 2,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 921,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 922,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.features).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'signal',
+        name: 'bullish_liquidity_zone_touch_entry',
+      }),
+    ]));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('does not derive a liquidity zone entry after close invalidates the bullish zone', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5499.75,
+          close: 5499.9,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5499.9,
+          high: 5503,
+          low: 5500.25,
+          close: 5502,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-invalidated-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'reclaim',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 4,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 931,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 932,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.features).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'signal',
+        name: 'bullish_liquidity_zone_reclaim_entry',
+      }),
+    ]));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('uses a bullish liquidity zone for at most one entry attempt', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5502,
+          high: 5503,
+          low: 5500.2,
+          close: 5502.25,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-single-use-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 941,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 942,
+                x: 2,
+                y: 5504,
+                text: 'MSS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 943,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const entrySignals = dataset.features.filter(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_touch_entry',
+    );
+
+    expect(entrySignals).toHaveLength(1);
+    expect(entrySignals[0].metadata.provenance.structureEvent).toEqual(expect.objectContaining({
+      name: 'BOS',
+    }));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('selects the confirmation zone using the configured liquidity zone preference', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-preference-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'prefer-FVG',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 951,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 952,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+              {
+                id: 953,
+                name: 'bullish_fair_value_gap',
+                x1: 1,
+                y1: 5500.3,
+                x2: 1,
+                y2: 5500.15,
+                text: 'Bullish FVG',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const entrySignal = dataset.features.find(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_touch_entry',
+    );
+
+    expect(entrySignal).toEqual(expect.objectContaining({
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          selectedZone: expect.objectContaining({
+            kind: 'fair_value_gap',
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('can confirm against a bullish liquidity zone that was already available when the structure event activates', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-existing-liquidity-zone-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 961,
+                x: 1,
+                y: 5503,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 962,
+                name: 'bullish_order_block',
+                x1: 0,
+                y1: 5500.4,
+                x2: 0,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'signal',
+        name: 'bullish_liquidity_zone_touch_entry',
+        eventTime: '2026-06-25T13:45:00.000Z',
+        metadata: expect.objectContaining({
+          provenance: expect.objectContaining({
+            selectedZone: expect.objectContaining({
+              eventTime: '2026-06-25T13:30:00.000Z',
+            }),
+          }),
+        }),
+      }),
+    ]));
+  });
+
   it('collects allowlisted TradingView studies into the exported dataset', async () => {
     const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-study-'));
     const client = makeMockClient([
