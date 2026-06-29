@@ -137,6 +137,53 @@ class NautilusValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "riskControls.trailingStopTicks is unsupported"):
             validate_strategy_spec(invalid_spec)
 
+    def test_nautilus_validation_honors_signal_feature_selector_type(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 104, high=104, low=104),
+                _bar("2026-06-25T13:45:00.000Z", 104, high=104, low=104),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ]
+            },
+            features=[
+                _typed_feature(
+                    "raw-plot",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="plot",
+                    name="bullish_bos",
+                    value=True,
+                ),
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                ),
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+            session_end="13:50",
+        )
+
+        self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "intraday-flat-before-close"])
+        self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:30:00+00:00")
+
     def test_nautilus_validation_does_not_execute_pending_entry_across_rth_sessions(self):
         result = _run_tiny_validation(
             bars=[
@@ -329,12 +376,23 @@ def _bar(timestamp: str, open_price: float, *, high: float, low: float):
 
 
 def _direction_feature(feature_id: str, timestamp: str, value=1):
+    return _typed_feature(
+        feature_id,
+        timestamp,
+        indicator_id="STD;Supertrend",
+        feature_type="plot",
+        name="direction",
+        value=value,
+    )
+
+
+def _typed_feature(feature_id: str, timestamp: str, *, indicator_id: str, feature_type: str, name: str, value):
     return {
         "id": feature_id,
         "source": "tradingview",
-        "indicatorId": "STD;Supertrend",
-        "type": "plot",
-        "name": "direction",
+        "indicatorId": indicator_id,
+        "type": feature_type,
+        "name": name,
         "eventTime": timestamp,
         "availabilityTime": timestamp,
         "repaintingRisk": "confirmed",

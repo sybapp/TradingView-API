@@ -12,6 +12,7 @@ JsonObject = Dict[str, Any]
 @dataclass(frozen=True)
 class FeatureEqualsEntryRule:
     indicator_id: str
+    feature_type: Optional[str]
     name: str
     value: Any
     side: str
@@ -117,22 +118,32 @@ def _parse_entry_rules(value: Any, errors: List[str]) -> List[FeatureEqualsEntry
         if not isinstance(feature, dict):
             errors.append(f"{path}.feature must be an object")
             continue
-        _reject_unknown_keys(feature, {"indicatorId", "name"}, f"{path}.feature", errors)
+        _reject_unknown_keys(feature, {"indicatorId", "type", "name"}, f"{path}.feature", errors)
         indicator_id = feature.get("indicatorId")
+        feature_type = feature.get("type")
         name = feature.get("name")
         side = rule.get("side")
         if not isinstance(indicator_id, str) or not indicator_id:
             errors.append(f"{path}.feature.indicatorId must be a non-empty string")
+        if feature_type is not None and (not isinstance(feature_type, str) or not feature_type):
+            errors.append(f"{path}.feature.type must be a non-empty string when provided")
         if not isinstance(name, str) or not name:
             errors.append(f"{path}.feature.name must be a non-empty string")
         if side != "long":
             errors.append(f"{path}.side must be long")
         if "value" not in rule:
             errors.append(f"{path}.value is required")
-        if isinstance(indicator_id, str) and isinstance(name, str) and side == "long" and "value" in rule:
+        if (
+            isinstance(indicator_id, str)
+            and isinstance(name, str)
+            and (feature_type is None or isinstance(feature_type, str))
+            and side == "long"
+            and "value" in rule
+        ):
             rules.append(
                 FeatureEqualsEntryRule(
                     indicator_id=indicator_id,
+                    feature_type=feature_type,
                     name=name,
                     value=rule["value"],
                     side=side,

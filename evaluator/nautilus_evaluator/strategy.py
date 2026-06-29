@@ -467,6 +467,7 @@ def _matching_entry_rule(
     for rule in rules:
         if any(
             feature.indicator_id == rule.indicator_id
+            and (rule.feature_type is None or feature.type == rule.feature_type)
             and feature.name == rule.name
             and feature.value == rule.value
             for feature in available_features

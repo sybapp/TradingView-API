@@ -58,6 +58,83 @@ class StrategyEvaluatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "riskControls.intradayFlat must be true"):
             validate_strategy_spec(invalid_spec)
 
+    def test_strategy_spec_validation_accepts_optional_feature_type(self):
+        spec = {
+            **HAND_WRITTEN_SPEC,
+            "entryRules": [
+                {
+                    "type": "feature_equals",
+                    "feature": {
+                        "indicatorId": "STD;LuxAlgo",
+                        "type": "signal",
+                        "name": "bullish_bos",
+                    },
+                    "value": True,
+                    "side": "long",
+                }
+            ],
+        }
+
+        validated = validate_strategy_spec(spec)
+
+        self.assertEqual(validated.entry_rules[0].indicator_id, "STD;LuxAlgo")
+        self.assertEqual(validated.entry_rules[0].feature_type, "signal")
+        self.assertEqual(validated.entry_rules[0].name, "bullish_bos")
+        self.assertTrue(validated.entry_rules[0].value)
+
+    def test_strategy_replay_honors_signal_feature_type_without_breaking_legacy_specs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "raw-plot",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="plot",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                    _typed_feature(
+                        "signal-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                ],
+                prices=[100, 100, 104],
+                session_dates=["2026-06-25"],
+            )
+            signal_only_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-signal-long",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=signal_only_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "intraday-flat-before-close"])
+            self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:30:00+00:00")
+            self.assertEqual(result.orders[0].execution_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
+
     def test_walk_forward_scoring_does_not_use_training_window_features(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             dataset_path = _write_walk_forward_dataset(
@@ -229,16 +306,27 @@ def _bar(timestamp: str, open_price: float):
 
 
 def _direction_feature(feature_id: str, timestamp: str):
+    return _typed_feature(
+        feature_id,
+        timestamp,
+        indicator_id="STD;Supertrend",
+        feature_type="plot",
+        name="direction",
+        value=1,
+    )
+
+
+def _typed_feature(feature_id: str, timestamp: str, *, indicator_id: str, feature_type: str, name: str, value):
     return {
         "id": feature_id,
         "source": "tradingview",
-        "indicatorId": "STD;Supertrend",
-        "type": "plot",
-        "name": "direction",
+        "indicatorId": indicator_id,
+        "type": feature_type,
+        "name": name,
         "eventTime": timestamp,
         "availabilityTime": timestamp,
         "repaintingRisk": "confirmed",
-        "value": 1,
+        "value": value,
     }
 
 
