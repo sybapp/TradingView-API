@@ -311,6 +311,118 @@ describe('TradingView collector', () => {
     expect(features).toEqual([]);
   });
 
+  it('keeps LuxAlgo ICT/SMC out of the default curated indicator allowlist', () => {
+    const luxAlgoIds = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST
+      .map((indicator) => indicator.id);
+
+    expect(TradingView.collector.CURATED_INDICATOR_ALLOWLIST.map((indicator) => indicator.id))
+      .not.toEqual(expect.arrayContaining(luxAlgoIds));
+  });
+
+  it('collects LuxAlgo ICT/SMC through the opt-in widgetdata smoke path', async () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-luxalgo-'));
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const client = makeMockClient([
+      {
+        time: Date.parse('2026-06-25T13:30:00.000Z') / 1000,
+        open: 5500.25,
+        max: 5502.5,
+        min: 5498.75,
+        close: 5501,
+        volume: 1200,
+      },
+      {
+        time: Date.parse('2026-06-25T13:35:00.000Z') / 1000,
+        open: 5501,
+        max: 5503,
+        min: 5500.5,
+        close: 5502.25,
+        volume: 980,
+      },
+    ], {}, {
+      [luxAlgoIctSmc.id]: {
+        graphic: {
+          labels: [
+            {
+              id: 41,
+              x: 0,
+              y: 5502.5,
+              text: 'BOS',
+              style: 'label_down',
+            },
+          ],
+          boxes: [
+            {
+              id: 42,
+              name: 'bullish_order_block',
+              x1: 0,
+              y1: 5502.5,
+              x2: 1,
+              y2: 5498.75,
+              text: 'Bullish OB',
+            },
+          ],
+        },
+      },
+    });
+    let clientOptions;
+
+    const result = await TradingView.collector.collectEsRth5mLuxAlgoIctSmcDataset({
+      createClient: (options) => {
+        clientOptions = options;
+        return client;
+      },
+      outputPath,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      minBars: 2,
+      timeoutMs: 1000,
+      resolveIndicator: (indicator) => Promise.resolve({ id: indicator.id }),
+    });
+
+    expect(clientOptions).toMatchObject({ server: 'widgetdata' });
+    expect(result.validation).toEqual({ valid: true, errors: [] });
+    expect(result.dataset.manifest.collection).toEqual({
+      kind: 'luxalgo-ict-smc-opt-in',
+      tradingViewBackend: 'widgetdata',
+      optIn: true,
+    });
+    expect(result.dataset.manifest.indicators).toEqual([
+      expect.objectContaining({
+        id: luxAlgoIctSmc.id,
+        name: 'LuxAlgo ICT/SMC',
+        version: '7',
+        repaintingRisk: 'repainting-risk',
+      }),
+    ]);
+    expect(result.dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'BOS',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          text: 'BOS',
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'bullish_order_block',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          top: 5502.5,
+          bottom: 5498.75,
+          text: 'Bullish OB',
+        }),
+      }),
+    ]));
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(result.dataset);
+  });
+
   it('collects allowlisted TradingView studies into the exported dataset', async () => {
     const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-study-'));
     const client = makeMockClient([

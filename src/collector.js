@@ -48,6 +48,17 @@ const CURATED_INDICATOR_ALLOWLIST = [
   },
 ];
 
+const LUXALGO_ICT_SMC_COLLECTION_KIND = 'luxalgo-ict-smc-opt-in';
+const LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND = 'widgetdata';
+const LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST = [
+  {
+    id: 'PUB;6daafb2cabe6419d98ae25229d2327f8',
+    name: 'LuxAlgo ICT/SMC',
+    version: '7',
+    repaintingRisk: 'repainting-risk',
+  },
+];
+
 function toIsoTimestamp(seconds) {
   return new Date(seconds * 1000).toISOString();
 }
@@ -562,6 +573,7 @@ function buildEsRthDataset({
   datasetId,
   indicatorAllowlist = CURATED_INDICATOR_ALLOWLIST,
   indicatorStudies = [],
+  collection,
 } = {}) {
   const collectedAt = now instanceof Date ? now : new Date(now);
   const session = {
@@ -601,6 +613,7 @@ function buildEsRthDataset({
         },
       },
       indicators: indicatorAllowlist.map((indicator) => ({ ...indicator })),
+      ...(collection ? { collection: { ...collection } } : {}),
     },
     bars,
     features: indicatorStudiesToFeatures({
@@ -673,13 +686,17 @@ async function collectEsRthDataset({
   indicatorStudies = [],
   includeIndicatorFeatures = true,
   resolveIndicator = defaultResolveIndicator,
+  tradingViewBackend = 'data',
+  collection,
 } = {}) {
   if (!outputPath) throw new Error('outputPath is required');
 
-  const client = createClient ? createClient() : new Client({
+  const clientOptions = {
     token: process.env.SESSION,
     signature: process.env.SIGNATURE,
-  });
+    server: tradingViewBackend,
+  };
+  const client = createClient ? createClient(clientOptions) : new Client(clientOptions);
   const chart = new client.Session.Chart();
 
   try {
@@ -707,6 +724,7 @@ async function collectEsRthDataset({
       now,
       indicatorAllowlist,
       indicatorStudies: collectedIndicatorStudies,
+      collection,
     });
     const validation = datasetContract.validateDataset(dataset);
 
@@ -735,6 +753,21 @@ async function collectEsRth5mDataset(options = {}) {
   });
 }
 
+async function collectEsRth5mLuxAlgoIctSmcDataset(options = {}) {
+  return collectEsRthDataset({
+    ...options,
+    defaults: ES_RTH_5M_DEFAULTS,
+    buildDataset: buildEsRth5mDataset,
+    indicatorAllowlist: LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+    tradingViewBackend: LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND,
+    collection: {
+      kind: LUXALGO_ICT_SMC_COLLECTION_KIND,
+      tradingViewBackend: LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND,
+      optIn: true,
+    },
+  });
+}
+
 async function collectEsRth15mDataset(options = {}) {
   return collectEsRthDataset({
     ...options,
@@ -745,6 +778,7 @@ async function collectEsRth15mDataset(options = {}) {
 
 module.exports = {
   collectEsRth5mDataset,
+  collectEsRth5mLuxAlgoIctSmcDataset,
   collectEsRth15mDataset,
   buildEsRth5mDataset,
   buildEsRth15mDataset,
@@ -753,4 +787,5 @@ module.exports = {
   periodsToRthBars,
   writeVersionedDatasetSync,
   CURATED_INDICATOR_ALLOWLIST,
+  LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
 };
