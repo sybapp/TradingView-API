@@ -50,6 +50,8 @@ const CURATED_INDICATOR_ALLOWLIST = [
 
 const LUXALGO_ICT_SMC_COLLECTION_KIND = 'luxalgo-ict-smc-opt-in';
 const LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND = 'widgetdata';
+const LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE = 'luxalgo-structure-event-direction';
+const LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION = '1';
 const LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST = [
   {
     id: 'PUB;6daafb2cabe6419d98ae25229d2327f8',
@@ -330,6 +332,105 @@ function normalizeGraphicFeature({
   };
 }
 
+function isLuxAlgoStructureEventName(name) {
+  return ['BOS', 'CHoCH', 'MSS'].includes(name);
+}
+
+function deriveDirectionEvidenceFromLabelStyle(style) {
+  if (style === 'label_up') {
+    return {
+      direction: 'bullish',
+      evidenceType: 'label_style',
+      evidenceValue: style,
+    };
+  }
+
+  if (style === 'label_down') {
+    return {
+      direction: 'bearish',
+      evidenceType: 'label_style',
+      evidenceValue: style,
+    };
+  }
+
+  return null;
+}
+
+function signalNameForStructureEvent(structureEventName, direction) {
+  return `${direction}_${structureEventName.toLowerCase()}`;
+}
+
+function normalizeDerivedSignalFeature({
+  indicator,
+  eventTime,
+  availabilityTime,
+  signalName,
+  index,
+  sourceFeatureId,
+  directionEvidence,
+}) {
+  return {
+    id: featureId({
+      indicatorId: indicator.id,
+      type: 'signal',
+      name: signalName,
+      eventTime,
+      availabilityTime,
+      index,
+    }),
+    source: 'tradingview',
+    indicatorId: indicator.id,
+    type: 'signal',
+    name: signalName,
+    eventTime,
+    availabilityTime,
+    repaintingRisk: indicator.repaintingRisk,
+    value: true,
+    metadata: {
+      provenance: {
+        sourceFeatureIds: [sourceFeatureId],
+        derivation: {
+          rule: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE,
+          version: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION,
+        },
+        directionEvidence,
+      },
+    },
+  };
+}
+
+function deriveLuxAlgoStructureSignals({ indicator, features, startIndex }) {
+  if (indicator.id !== LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id) {
+    return { features: [], nextIndex: startIndex };
+  }
+
+  let index = startIndex;
+  const derivedFeatures = [];
+
+  features.forEach((feature) => {
+    if (feature.type !== 'label' || !isLuxAlgoStructureEventName(feature.name)) return;
+
+    const directionEvidence = deriveDirectionEvidenceFromLabelStyle(feature.value?.style);
+    if (!directionEvidence) return;
+
+    derivedFeatures.push(normalizeDerivedSignalFeature({
+      indicator,
+      eventTime: feature.eventTime,
+      availabilityTime: feature.availabilityTime,
+      signalName: signalNameForStructureEvent(feature.name, directionEvidence.direction),
+      index,
+      sourceFeatureId: feature.id,
+      directionEvidence,
+    }));
+    index += 1;
+  });
+
+  return {
+    features: derivedFeatures,
+    nextIndex: index,
+  };
+}
+
 function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
   let index = startIndex;
   const features = [];
@@ -485,6 +586,14 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
     }));
     index += 1;
   });
+
+  const derivedSignalResult = deriveLuxAlgoStructureSignals({
+    indicator,
+    features,
+    startIndex: index,
+  });
+  features.push(...derivedSignalResult.features);
+  index = derivedSignalResult.nextIndex;
 
   return { features, nextIndex: index };
 }

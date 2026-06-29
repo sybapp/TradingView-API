@@ -618,6 +618,141 @@ describe('TradingView collector', () => {
     expect(dataset.features.map((feature) => feature.id)).not.toContain('601');
   });
 
+  it('derives directional LuxAlgo structure-event candidate signals only when direction is auditable', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-directional-signal-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 801,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 802,
+                x: 1,
+                y: 5500.5,
+                text: 'CHoCH',
+                style: 'label_down',
+                yLoc: 'price',
+              },
+              {
+                id: 803,
+                x: 2,
+                y: 5503.25,
+                text: 'MSS',
+                style: 'label_left',
+                yLoc: 'price',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+
+    const rawLuxAlgoFeatures = dataset.features.filter(
+      (feature) => feature.indicatorId === luxAlgoIctSmc.id && feature.type === 'label',
+    );
+    const derivedSignals = dataset.features.filter(
+      (feature) => feature.indicatorId === luxAlgoIctSmc.id && feature.type === 'signal',
+    );
+
+    expect(rawLuxAlgoFeatures).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'BOS',
+        value: expect.objectContaining({
+          graphicId: 801,
+          text: 'BOS',
+        }),
+      }),
+      expect.objectContaining({
+        name: 'CHoCH',
+        value: expect.objectContaining({
+          graphicId: 802,
+          text: 'CHoCH',
+        }),
+      }),
+      expect.objectContaining({
+        name: 'MSS',
+        value: expect.objectContaining({
+          graphicId: 803,
+          text: 'MSS',
+        }),
+      }),
+    ]));
+
+    expect(derivedSignals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'signal',
+        name: 'bullish_bos',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: true,
+        metadata: expect.objectContaining({
+          provenance: expect.objectContaining({
+            sourceFeatureIds: [
+              expect.stringContaining(`${luxAlgoIctSmc.id}:label:BOS:2026-06-25T13-30-00-000Z`),
+            ],
+            derivation: expect.objectContaining({
+              rule: 'luxalgo-structure-event-direction',
+              version: '1',
+            }),
+            directionEvidence: expect.objectContaining({
+              direction: 'bullish',
+              evidenceType: 'label_style',
+              evidenceValue: 'label_up',
+            }),
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'signal',
+        name: 'bearish_choch',
+        eventTime: '2026-06-25T13:35:00.000Z',
+        availabilityTime: '2026-06-25T13:40:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: true,
+        metadata: expect.objectContaining({
+          provenance: expect.objectContaining({
+            sourceFeatureIds: [
+              expect.stringContaining(`${luxAlgoIctSmc.id}:label:CHoCH:2026-06-25T13-35-00-000Z`),
+            ],
+            derivation: expect.objectContaining({
+              rule: 'luxalgo-structure-event-direction',
+              version: '1',
+            }),
+            directionEvidence: expect.objectContaining({
+              direction: 'bearish',
+              evidenceType: 'label_style',
+              evidenceValue: 'label_down',
+            }),
+          }),
+        }),
+      }),
+    ]));
+    expect(derivedSignals).toHaveLength(2);
+    expect(derivedSignals.map((feature) => feature.name)).not.toContain('bullish_mss');
+    expect(derivedSignals.map((feature) => feature.name)).not.toContain('bearish_mss');
+  });
+
   it('collects allowlisted TradingView studies into the exported dataset', async () => {
     const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-study-'));
     const client = makeMockClient([

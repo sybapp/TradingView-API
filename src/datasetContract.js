@@ -43,6 +43,12 @@ function requireNumber(errors, value, pathName) {
   }
 }
 
+function requireBoolean(errors, value, pathName) {
+  if (typeof value !== 'boolean') {
+    addError(errors, pathName, 'must be a boolean');
+  }
+}
+
 function requireTimestamp(errors, value, pathName) {
   if (!isIsoTimestamp(value)) {
     addError(errors, pathName, 'must be an ISO timestamp');
@@ -301,7 +307,75 @@ function validateFeatures(features, errors) {
         'must be confirmed or repainting-risk',
       );
     }
+
+    if (feature.type === 'signal') {
+      requireBoolean(errors, feature.value, `${pathName}.value`);
+    }
+
+    if (feature.metadata !== undefined) {
+      validateFeatureMetadata(feature.metadata, errors, `${pathName}.metadata`);
+    }
   });
+}
+
+function validateFeatureMetadata(metadata, errors, pathName) {
+  if (!requireObject(errors, metadata, pathName)) return;
+
+  if (metadata.provenance === undefined) return;
+  if (!requireObject(errors, metadata.provenance, `${pathName}.provenance`)) return;
+
+  const { provenance } = metadata;
+
+  if (provenance.sourceFeatureIds !== undefined) {
+    if (!Array.isArray(provenance.sourceFeatureIds) || provenance.sourceFeatureIds.length === 0) {
+      addError(errors, `${pathName}.provenance.sourceFeatureIds`, 'must be a non-empty array');
+    } else {
+      provenance.sourceFeatureIds.forEach((featureId, index) => {
+        requireString(
+          errors,
+          featureId,
+          `${pathName}.provenance.sourceFeatureIds[${index}]`,
+        );
+      });
+    }
+  }
+
+  if (provenance.derivation !== undefined) {
+    if (requireObject(errors, provenance.derivation, `${pathName}.provenance.derivation`)) {
+      requireString(errors, provenance.derivation.rule, `${pathName}.provenance.derivation.rule`);
+      requireString(
+        errors,
+        provenance.derivation.version,
+        `${pathName}.provenance.derivation.version`,
+      );
+    }
+  }
+
+  if (provenance.directionEvidence !== undefined) {
+    if (
+      requireObject(
+        errors,
+        provenance.directionEvidence,
+        `${pathName}.provenance.directionEvidence`,
+      )
+    ) {
+      requireString(
+        errors,
+        provenance.directionEvidence.direction,
+        `${pathName}.provenance.directionEvidence.direction`,
+      );
+      requireString(
+        errors,
+        provenance.directionEvidence.evidenceType,
+        `${pathName}.provenance.directionEvidence.evidenceType`,
+      );
+      requireString(
+        errors,
+        provenance.directionEvidence.evidenceValue,
+        `${pathName}.provenance.directionEvidence.evidenceValue`,
+      );
+    }
+  }
 }
 
 function validateDataset(dataset) {
