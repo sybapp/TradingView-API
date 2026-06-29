@@ -9,7 +9,13 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "evaluator"))
 
-from nautilus_evaluator import CostModel, run_nautilus_validation_backtest, validate_strategy_spec
+from nautilus_evaluator import (
+    CostModel,
+    run_nautilus_validation_backtest,
+    run_walk_forward_candidate_selection_backtest,
+    validate_strategy_spec,
+)
+from nautilus_evaluator import FitnessConstraints, WalkForwardConfig
 
 
 FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "es-rth-5m-dataset"
@@ -159,6 +165,87 @@ class NautilusValidationTests(unittest.TestCase):
                     registry_path=Path(temp_dir) / "run-registry",
                 )
 
+    def test_walk_forward_candidate_selection_uses_training_window_not_scoring_features(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = Path(temp_dir) / "dataset"
+            _write_tiny_dataset(
+                dataset_path,
+                bars=[
+                    _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                    _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                    _bar("2026-06-25T13:40:00.000Z", 104, high=104, low=104),
+                    _bar("2026-06-26T13:30:00.000Z", 100, high=100, low=100),
+                    _bar("2026-06-26T13:35:00.000Z", 100, high=100, low=100),
+                    _bar("2026-06-26T13:40:00.000Z", 120, high=120, low=120),
+                ],
+                session_end="13:45",
+                features=[
+                    _direction_feature("training-only-negative", "2026-06-25T13:30:00.000Z", value=-1),
+                    _direction_feature("scoring-only-positive", "2026-06-26T13:30:00.000Z", value=1),
+                ],
+                sessions=[
+                    _session("2026-06-25", "2026-06-25T13:30:00.000Z", "2026-06-25T13:40:00.000Z", session_end="13:45"),
+                    _session("2026-06-26", "2026-06-26T13:30:00.000Z", "2026-06-26T13:40:00.000Z", session_end="13:45"),
+                ],
+            )
+            positive_scoring_candidate = _strategy_spec(
+                spec_overrides={
+                    "strategyId": "candidate-positive-scoring-only",
+                    "entryRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {"indicatorId": "STD;Supertrend", "name": "direction"},
+                            "value": 1,
+                            "side": "long",
+                        }
+                    ],
+                }
+            )
+            negative_training_candidate = _strategy_spec(
+                spec_overrides={
+                    "strategyId": "candidate-negative-training",
+                    "entryRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {"indicatorId": "STD;Supertrend", "name": "direction"},
+                            "value": -1,
+                            "side": "long",
+                        }
+                    ],
+                }
+            )
+
+            result = run_walk_forward_candidate_selection_backtest(
+                dataset_path=dataset_path,
+                candidate_specs=[positive_scoring_candidate, negative_training_candidate],
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+                walk_forward=WalkForwardConfig(training_sessions=1, scoring_sessions=1),
+                fitness_constraints=FitnessConstraints(min_trades=0, min_profitable_windows=0),
+            )
+
+            self.assertEqual(result.engine, "nautilus-trader-walk-forward-training-window-selection")
+            self.assertEqual(result.selection_results[0].selected_strategy_id, "candidate-negative-training")
+            self.assertEqual(result.training_window_results[0].net_pnl, 400)
+            self.assertEqual(result.window_results[0].trade_count, 0)
+            self.assertEqual(result.window_results[0].net_pnl, 0)
+
+            registry_record = json.loads(result.registry_record_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                registry_record["searchConfiguration"]["type"],
+                "training-window-candidate-selection",
+            )
+            selection_record = registry_record["trainingWindowSelection"][0]
+            self.assertEqual(selection_record["selectedCandidate"]["strategyId"], "candidate-negative-training")
+            self.assertEqual(selection_record["selectedCandidate"]["selectionRankingInputs"]["netPnl"], 400)
+            self.assertEqual(
+                [item["strategyId"] for item in selection_record["selectionInputs"]],
+                ["candidate-positive-scoring-only", "candidate-negative-training"],
+            )
+            self.assertEqual(selection_record["selectionInputs"][0]["trainingResult"]["netPnl"], 0)
+            self.assertEqual(registry_record["perWindowResults"][0]["netPnl"], 0)
+            self.assertEqual(registry_record["finalRankingInputs"], registry_record["fitness"]["rankingInputs"])
+
 
 def _run_tiny_validation(
     *,
@@ -241,7 +328,7 @@ def _bar(timestamp: str, open_price: float, *, high: float, low: float):
     }
 
 
-def _direction_feature(feature_id: str, timestamp: str):
+def _direction_feature(feature_id: str, timestamp: str, value=1):
     return {
         "id": feature_id,
         "source": "tradingview",
@@ -251,7 +338,7 @@ def _direction_feature(feature_id: str, timestamp: str):
         "eventTime": timestamp,
         "availabilityTime": timestamp,
         "repaintingRisk": "confirmed",
-        "value": 1,
+        "value": value,
     }
 
 

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, time, timedelta
 import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 from zoneinfo import ZoneInfo
 
 from .dataset import FeatureRecord, VersionedDataset, load_versioned_dataset
@@ -115,6 +115,28 @@ class WalkForwardWindowResult:
 
 
 @dataclass(frozen=True)
+class WalkForwardCandidateWindowResult:
+    candidate_id: str
+    strategy_id: str
+    strategy_spec: Dict[str, Any]
+    training_result: WalkForwardWindowResult
+    selection_ranking_inputs: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class WalkForwardWindowSelection:
+    window_id: str
+    training: WindowRange
+    scoring: WindowRange
+    candidate_results: List[WalkForwardCandidateWindowResult]
+    selected_candidate_id: str
+    selected_strategy_id: str
+    selected_strategy_spec: Dict[str, Any]
+    selected_training_result: WalkForwardWindowResult
+    selection_ranking_inputs: Dict[str, Any]
+
+
+@dataclass(frozen=True)
 class FitnessResult:
     survived: bool
     score: Optional[float]
@@ -133,6 +155,7 @@ class WalkForwardBacktestResult:
     window_results: List[WalkForwardWindowResult]
     fitness: FitnessResult
     registry_record_path: Path
+    selection_results: List[WalkForwardWindowSelection] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -231,6 +254,99 @@ def run_walk_forward_backtest(
         window_results=scoring_window_results,
         fitness=fitness,
         registry_record_path=record_path,
+    )
+
+
+def run_walk_forward_candidate_selection_backtest(
+    *,
+    dataset_path: Union[str, Path],
+    candidate_specs: Sequence[Mapping[str, Any]],
+    cost_model: CostModel,
+    registry_path: Union[str, Path],
+    walk_forward: WalkForwardConfig,
+    fitness_constraints: FitnessConstraints,
+) -> WalkForwardBacktestResult:
+    from .validation import run_nautilus_validation_dataset
+
+    if not candidate_specs:
+        raise ValueError("candidate_specs must contain at least one Strategy Spec")
+
+    dataset = load_versioned_dataset(dataset_path)
+    specs = [validate_strategy_spec(candidate) for candidate in candidate_specs]
+    windows = _build_walk_forward_windows(dataset, walk_forward)
+
+    selection_results: List[WalkForwardWindowSelection] = []
+    selected_training_results: List[WalkForwardWindowResult] = []
+    scoring_window_results: List[WalkForwardWindowResult] = []
+    for window in windows:
+        training_dataset = _slice_dataset_for_window(dataset, window.training)
+        candidate_results: List[WalkForwardCandidateWindowResult] = []
+        for index, spec in enumerate(specs, start=1):
+            training_validation = run_nautilus_validation_dataset(
+                dataset=training_dataset,
+                spec=spec,
+                cost_model=cost_model,
+            )
+            training_result = _walk_forward_result(window.window_id, window.training, training_validation)
+            candidate_results.append(
+                WalkForwardCandidateWindowResult(
+                    candidate_id=f"candidate-{index}",
+                    strategy_id=spec.strategy_id,
+                    strategy_spec=spec.raw,
+                    training_result=training_result,
+                    selection_ranking_inputs=_selection_ranking_inputs(training_result),
+                )
+            )
+
+        selected_candidate = _select_training_window_candidate(candidate_results)
+        selected_training_results.append(selected_candidate.training_result)
+
+        scoring_dataset = _slice_dataset_for_window(dataset, window.scoring)
+        scoring_validation = run_nautilus_validation_dataset(
+            dataset=scoring_dataset,
+            spec=validate_strategy_spec(selected_candidate.strategy_spec),
+            cost_model=cost_model,
+        )
+        scoring_window_results.append(_walk_forward_result(window.window_id, window.scoring, scoring_validation))
+        selection_results.append(
+            WalkForwardWindowSelection(
+                window_id=window.window_id,
+                training=window.training,
+                scoring=window.scoring,
+                candidate_results=candidate_results,
+                selected_candidate_id=selected_candidate.candidate_id,
+                selected_strategy_id=selected_candidate.strategy_id,
+                selected_strategy_spec=selected_candidate.strategy_spec,
+                selected_training_result=selected_candidate.training_result,
+                selection_ranking_inputs=selected_candidate.selection_ranking_inputs,
+            )
+        )
+
+    fitness = _evaluate_fitness(scoring_window_results, fitness_constraints)
+    record_path = _write_walk_forward_registry_record(
+        registry_path=Path(registry_path),
+        dataset=dataset,
+        spec=specs[0],
+        cost_model=cost_model,
+        walk_forward=walk_forward,
+        constraints=fitness_constraints,
+        windows=windows,
+        training_window_results=selected_training_results,
+        scoring_window_results=scoring_window_results,
+        fitness=fitness,
+        selection_results=selection_results,
+    )
+
+    return WalkForwardBacktestResult(
+        dataset_id=dataset.dataset_id,
+        strategy_id="walk-forward-selected-candidates",
+        engine="nautilus-trader-walk-forward-training-window-selection",
+        windows=windows,
+        training_window_results=selected_training_results,
+        window_results=scoring_window_results,
+        fitness=fitness,
+        registry_record_path=record_path,
+        selection_results=selection_results,
     )
 
 
@@ -607,6 +723,34 @@ def _result_summary(result: StrategyBacktestResult) -> Dict[str, Any]:
     }
 
 
+def _selection_ranking_inputs(result: WalkForwardWindowResult) -> Dict[str, Any]:
+    return {
+        "netPnl": result.net_pnl,
+        "grossPnl": result.gross_pnl,
+        "totalCosts": result.total_costs,
+        "tradeCount": result.trade_count,
+        "maxDrawdown": result.max_drawdown,
+    }
+
+
+def _select_training_window_candidate(
+    candidates: List[WalkForwardCandidateWindowResult],
+) -> WalkForwardCandidateWindowResult:
+    if not candidates:
+        raise ValueError("cannot select from an empty candidate list")
+    return sorted(candidates, key=_training_candidate_rank_key, reverse=True)[0]
+
+
+def _training_candidate_rank_key(candidate: WalkForwardCandidateWindowResult):
+    inputs = candidate.selection_ranking_inputs
+    return (
+        inputs["netPnl"],
+        inputs["tradeCount"],
+        -inputs["maxDrawdown"],
+        candidate.strategy_id,
+    )
+
+
 def _evaluate_fitness(
     window_results: List[WalkForwardWindowResult],
     constraints: FitnessConstraints,
@@ -807,8 +951,9 @@ def _write_walk_forward_registry_record(
     training_window_results: List[WalkForwardWindowResult],
     scoring_window_results: List[WalkForwardWindowResult],
     fitness: FitnessResult,
+    selection_results: Optional[List[WalkForwardWindowSelection]] = None,
 ) -> Path:
-    run_id = _walk_forward_run_id(dataset, spec, cost_model, walk_forward, constraints)
+    run_id = _walk_forward_run_id(dataset, spec, cost_model, walk_forward, constraints, selection_results)
     run_path = registry_path / run_id
     run_path.mkdir(parents=True, exist_ok=True)
 
@@ -829,6 +974,8 @@ def _write_walk_forward_registry_record(
         encoding="utf-8",
     )
 
+    selection_results = selection_results or []
+    uses_training_selection = bool(selection_results)
     record = {
         "runId": run_id,
         "recordType": "Nautilus Walk-Forward Validation",
@@ -846,14 +993,15 @@ def _write_walk_forward_registry_record(
         "strategySpec": spec.raw,
         "costModel": _cost_model_to_json(cost_model),
         "evaluatorVersion": EVALUATOR_VERSION,
-        "searchConfiguration": {
-            "type": "fixed-strategy-spec",
-            "description": "No optimizer is run in this slice; training and scoring windows are validated separately through NautilusTrader.",
-        },
+        "searchConfiguration": _walk_forward_search_configuration(uses_training_selection),
         "walkForward": {
             "config": _walk_forward_config_to_json(walk_forward),
             "windows": [_walk_forward_window_to_json(window) for window in windows],
         },
+        "trainingWindowSelection": [
+            _walk_forward_selection_to_json(selection)
+            for selection in selection_results
+        ],
         "trainingWindowResults": [
             _walk_forward_window_result_to_json(
                 result,
@@ -869,6 +1017,7 @@ def _write_walk_forward_registry_record(
             for result in scoring_window_results
         ],
         "fitness": _fitness_to_json(fitness),
+        "finalRankingInputs": fitness.ranking_inputs,
         "artifacts": {
             "ordersByWindow": "orders-by-window.json",
         },
@@ -920,6 +1069,7 @@ def _walk_forward_run_id(
     cost_model: CostModel,
     walk_forward: WalkForwardConfig,
     constraints: FitnessConstraints,
+    selection_results: Optional[List[WalkForwardWindowSelection]] = None,
 ) -> str:
     payload = {
         "datasetId": dataset.dataset_id,
@@ -927,10 +1077,30 @@ def _walk_forward_run_id(
         "costModel": asdict(cost_model),
         "walkForward": asdict(walk_forward),
         "fitnessConstraints": asdict(constraints),
+        "selectedCandidates": [
+            {
+                "windowId": selection.window_id,
+                "selectedCandidateId": selection.selected_candidate_id,
+                "selectedStrategyId": selection.selected_strategy_id,
+            }
+            for selection in (selection_results or [])
+        ],
         "evaluatorVersion": EVALUATOR_VERSION,
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     return f"{spec.strategy_id}-walk-forward-{digest[:12]}"
+
+
+def _walk_forward_search_configuration(uses_training_selection: bool) -> Dict[str, Any]:
+    if uses_training_selection:
+        return {
+            "type": "training-window-candidate-selection",
+            "description": "Each split selects the Strategy Spec using only the training window, then scores the selected spec on the later out-of-sample window.",
+        }
+    return {
+        "type": "fixed-strategy-spec-diagnostic",
+        "description": "No optimizer is run in this diagnostic slice; the same fixed Strategy Spec is validated separately on training and scoring windows.",
+    }
 
 
 def _cost_model_to_json(cost_model: CostModel) -> Dict[str, Any]:
@@ -996,6 +1166,44 @@ def _walk_forward_window_result_to_json(
         "barType": result.bar_type,
         "costConfiguration": result.cost_configuration,
         "artifacts": artifacts,
+    }
+
+
+def _walk_forward_selection_to_json(selection: WalkForwardWindowSelection) -> Dict[str, Any]:
+    return {
+        "windowId": selection.window_id,
+        "trainingWindow": _window_range_to_json(selection.training),
+        "scoringWindow": _window_range_to_json(selection.scoring),
+        "selectionInputs": [
+            _walk_forward_candidate_result_to_json(candidate)
+            for candidate in selection.candidate_results
+        ],
+        "selectedCandidate": {
+            "candidateId": selection.selected_candidate_id,
+            "strategyId": selection.selected_strategy_id,
+            "strategySpec": selection.selected_strategy_spec,
+            "trainingResult": _walk_forward_window_result_to_json(
+                selection.selected_training_result,
+                artifacts={},
+            ),
+            "selectionRankingInputs": selection.selection_ranking_inputs,
+        },
+        "scoringResultWindowId": selection.window_id,
+    }
+
+
+def _walk_forward_candidate_result_to_json(
+    candidate: WalkForwardCandidateWindowResult,
+) -> Dict[str, Any]:
+    return {
+        "candidateId": candidate.candidate_id,
+        "strategyId": candidate.strategy_id,
+        "strategySpec": candidate.strategy_spec,
+        "trainingResult": _walk_forward_window_result_to_json(
+            candidate.training_result,
+            artifacts={},
+        ),
+        "selectionRankingInputs": candidate.selection_ranking_inputs,
     }
 
 
