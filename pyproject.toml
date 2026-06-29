@@ -1,0 +1,12 @@
+[project]
+name = "tradingview-api-evaluator"
+version = "0.1.0"
+description = "Python evaluator for TradingView-derived datasets."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "nautilus_trader==1.229.0",
+]
+
+[tool.uv]
+package = false

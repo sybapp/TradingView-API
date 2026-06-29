@@ -1,0 +1,27 @@
+[
+  {
+    "id": "feature-1",
+    "source": "tradingview",
+    "indicatorId": "STD;Supertrend",
+    "type": "plot",
+    "name": "direction",
+    "eventTime": "2026-06-25T13:35:00.000Z",
+    "availabilityTime": "2026-06-25T13:35:00.000Z",
+    "repaintingRisk": "confirmed",
+    "value": 1
+  },
+  {
+    "id": "feature-2",
+    "source": "tradingview",
+    "indicatorId": "STD;Zig_Zag",
+    "type": "label",
+    "name": "pivot_high_confirmed",
+    "eventTime": "2026-06-25T13:30:00.000Z",
+    "availabilityTime": "2026-06-25T13:35:00.000Z",
+    "repaintingRisk": "repainting-risk",
+    "value": {
+      "price": 5502.5,
+      "text": "PH"
+    }
+  }
+]
