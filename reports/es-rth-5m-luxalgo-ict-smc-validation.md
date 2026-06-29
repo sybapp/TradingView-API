@@ -53,6 +53,6 @@
 ## Reproduction
 
 - Dataset path: `datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28`
-- Search record: `runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json`
+- Search record: `runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-fb36aa2a21fa/search.json`
 - Run Registry path: `runs/luxalgo-ict-smc-es-rth-5m`
 - Re-run: `uv run python -m evaluator.nautilus_evaluator.luxalgo_report datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28 --run-registry runs/luxalgo-ict-smc-es-rth-5m`

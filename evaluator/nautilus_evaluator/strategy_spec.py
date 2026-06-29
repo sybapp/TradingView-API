@@ -14,6 +14,9 @@ class FeatureEqualsEntryRule:
     indicator_id: str
     feature_type: Optional[str]
     name: str
+    metadata: JsonObject
+    max_bars_after_structure_event: Optional[int]
+    zone_preference: Optional[str]
     value: Any
     side: str
 
@@ -176,10 +179,25 @@ def _parse_feature_equals_rule(
     if not isinstance(feature, dict):
         errors.append(f"{path}.feature must be an object")
         return None
-    _reject_unknown_keys(feature, {"indicatorId", "type", "name"}, f"{path}.feature", errors)
+    _reject_unknown_keys(
+        feature,
+        {
+            "indicatorId",
+            "type",
+            "name",
+            "metadata",
+            "maxBarsAfterStructureEvent",
+            "zonePreference",
+        },
+        f"{path}.feature",
+        errors,
+    )
     indicator_id = feature.get("indicatorId")
     feature_type = feature.get("type")
     name = feature.get("name")
+    metadata = feature.get("metadata", {})
+    max_bars_after_structure_event = feature.get("maxBarsAfterStructureEvent")
+    zone_preference = feature.get("zonePreference")
     side = rule.get("side")
     if not isinstance(indicator_id, str) or not indicator_id:
         errors.append(f"{path}.feature.indicatorId must be a non-empty string")
@@ -187,6 +205,13 @@ def _parse_feature_equals_rule(
         errors.append(f"{path}.feature.type must be a non-empty string when provided")
     if not isinstance(name, str) or not name:
         errors.append(f"{path}.feature.name must be a non-empty string")
+    if not isinstance(metadata, dict):
+        errors.append(f"{path}.feature.metadata must be an object when provided")
+        metadata = {}
+    if max_bars_after_structure_event is not None and not _is_non_negative_int(max_bars_after_structure_event):
+        errors.append(f"{path}.feature.maxBarsAfterStructureEvent must be a non-negative integer when provided")
+    if zone_preference is not None and zone_preference not in {"nearest-any", "prefer-OB", "prefer-FVG"}:
+        errors.append(f"{path}.feature.zonePreference must be nearest-any, prefer-OB, or prefer-FVG when provided")
     if side != "long":
         errors.append(f"{path}.side must be long")
     if "value" not in rule:
@@ -202,6 +227,13 @@ def _parse_feature_equals_rule(
             indicator_id=indicator_id,
             feature_type=feature_type,
             name=name,
+            metadata=dict(metadata),
+            max_bars_after_structure_event=(
+                max_bars_after_structure_event
+                if isinstance(max_bars_after_structure_event, int)
+                else None
+            ),
+            zone_preference=zone_preference if isinstance(zone_preference, str) else None,
             value=rule["value"],
             side=side,
         )

@@ -269,6 +269,7 @@ class _StrategySpecNautilusAdapter:
                 if _all_entry_rules_match(
                     self.spec.entry_rules,
                     self.dataset.features,
+                    self.dataset.bars,
                     bar.ts_event,
                     earliest_feature_ns=session.first_bar_ns,
                 ):
@@ -369,6 +370,7 @@ class _StrategySpecNautilusAdapter:
                 matched_exit_rule = _matching_feature_rule(
                     self.spec.exits.reverse_signal_rules,
                     self.dataset.features,
+                    self.dataset.bars,
                     bar.ts_event,
                     earliest_feature_ns=position.entry_bar_ns,
                 )
@@ -474,6 +476,7 @@ def _nautilus_fill_model(cost_model: CostModel, nautilus: Mapping[str, Any]) -> 
 def _all_entry_rules_match(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
+    bars: List[DatasetBar],
     bar_time_ns: int,
     *,
     earliest_feature_ns: Optional[int] = None,
@@ -482,6 +485,7 @@ def _all_entry_rules_match(
         _feature_rule_matches(
             rule,
             features,
+            bars,
             bar_time_ns,
             earliest_feature_ns=earliest_feature_ns,
         )
@@ -492,6 +496,7 @@ def _all_entry_rules_match(
 def _matching_feature_rule(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
+    bars: List[DatasetBar],
     bar_time_ns: int,
     *,
     earliest_feature_ns: Optional[int] = None,
@@ -500,6 +505,7 @@ def _matching_feature_rule(
         if _feature_rule_matches(
             rule,
             features,
+            bars,
             bar_time_ns,
             earliest_feature_ns=earliest_feature_ns,
         ):
@@ -510,6 +516,7 @@ def _matching_feature_rule(
 def _feature_rule_matches(
     rule: FeatureEqualsEntryRule,
     features: List[FeatureRecord],
+    bars: List[DatasetBar],
     bar_time_ns: int,
     *,
     earliest_feature_ns: Optional[int] = None,
@@ -528,8 +535,80 @@ def _feature_rule_matches(
         and (rule.feature_type is None or feature.type == rule.feature_type)
         and feature.name == rule.name
         and feature.value == rule.value
+        and _metadata_matches(rule.metadata, feature.metadata)
+        and _within_max_bars_after_structure_event(rule, feature, bars)
+        and _zone_preference_matches(rule, feature)
         for feature in available_features
     )
+
+
+def _metadata_matches(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> bool:
+    for key, expected_value in expected.items():
+        if key not in actual:
+            return False
+        actual_value = actual[key]
+        if isinstance(expected_value, dict):
+            if not isinstance(actual_value, dict):
+                return False
+            if not _metadata_matches(expected_value, actual_value):
+                return False
+        elif actual_value != expected_value:
+            return False
+    return True
+
+
+def _within_max_bars_after_structure_event(
+    rule: FeatureEqualsEntryRule,
+    feature: FeatureRecord,
+    bars: List[DatasetBar],
+) -> bool:
+    if rule.max_bars_after_structure_event is None:
+        return True
+    structure_time = (
+        feature.metadata
+        .get("provenance", {})
+        .get("structureEvent", {})
+        .get("availabilityTime")
+    )
+    if not isinstance(structure_time, str):
+        return False
+    structure_index = _bar_index_at_timestamp(bars, structure_time)
+    signal_index = _bar_index_at_ns(bars, timestamp_to_nanoseconds(feature.availability_time))
+    if structure_index is None or signal_index is None:
+        return False
+    bars_after_structure_event = signal_index - structure_index
+    return 0 <= bars_after_structure_event <= rule.max_bars_after_structure_event
+
+
+def _zone_preference_matches(rule: FeatureEqualsEntryRule, feature: FeatureRecord) -> bool:
+    if rule.zone_preference is None or rule.zone_preference == "nearest-any":
+        return True
+    selected_kind = (
+        feature.metadata
+        .get("provenance", {})
+        .get("selectedZone", {})
+        .get("kind")
+    )
+    if rule.zone_preference == "prefer-OB":
+        return selected_kind == "order_block"
+    if rule.zone_preference == "prefer-FVG":
+        return selected_kind == "fair_value_gap"
+    return False
+
+
+def _bar_index_at_timestamp(bars: List[DatasetBar], value: str) -> Optional[int]:
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _bar_index_at_ns(bars, timestamp_to_nanoseconds(timestamp))
+
+
+def _bar_index_at_ns(bars: List[DatasetBar], timestamp_ns: int) -> Optional[int]:
+    for index, bar in enumerate(bars):
+        if timestamp_to_nanoseconds(bar.time) == timestamp_ns:
+            return index
+    return None
 
 
 def _session_windows(dataset: VersionedDataset, flat_before_close_minutes: int) -> List[_SessionWindow]:

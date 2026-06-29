@@ -304,6 +304,179 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
             self.assertEqual(result.orders[0].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
 
+    def test_strategy_replay_honors_luxalgo_signal_provenance_selectors(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "structure-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                    _typed_feature(
+                        "zone-entry",
+                        "2026-06-25T13:40:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_liquidity_zone_touch_entry",
+                        value=True,
+                        metadata={
+                            "provenance": {
+                                "structureEvent": {"availabilityTime": "2026-06-25T13:30:00.000Z"},
+                                "selectedZone": {"kind": "order_block"},
+                            }
+                        },
+                    ),
+                ],
+                prices=[100, 100, 100, 100, 100],
+                session_dates=["2026-06-25"],
+                session_end="14:00",
+            )
+            spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-luxalgo-provenance-selector",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                            "metadata": {"provenance": {"selectedZone": {"kind": "order_block"}}},
+                            "maxBarsAfterStructureEvent": 2,
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                ],
+                "exits": {"maxBarsInTrade": 1},
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
+
+            blocked = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec={
+                    **spec,
+                    "strategyId": "fixture-luxalgo-provenance-selector-blocked",
+                    "entryRules": [
+                        spec["entryRules"][0],
+                        {
+                            **spec["entryRules"][1],
+                            "feature": {
+                                **spec["entryRules"][1]["feature"],
+                                "zonePreference": "prefer-FVG",
+                            },
+                        },
+                    ],
+                },
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+            self.assertEqual(blocked.orders, [])
+
+    def test_strategy_replay_rejects_zone_signal_before_structure_provenance(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "structure-entry",
+                        "2026-06-25T13:40:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                    _typed_feature(
+                        "zone-entry",
+                        "2026-06-25T13:35:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_liquidity_zone_touch_entry",
+                        value=True,
+                        metadata={
+                            "provenance": {
+                                "structureEvent": {"availabilityTime": "2026-06-25T13:40:00.000Z"},
+                                "selectedZone": {"kind": "order_block"},
+                            }
+                        },
+                    ),
+                ],
+                prices=[100, 100, 100, 100],
+                session_dates=["2026-06-25"],
+                session_end="13:55",
+            )
+            spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-luxalgo-provenance-reversed-time",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                            "metadata": {"provenance": {"selectedZone": {"kind": "order_block"}}},
+                            "maxBarsAfterStructureEvent": 2,
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                ],
+                "exits": {"maxBarsInTrade": 1},
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual(result.orders, [])
+
     def test_strategy_replay_honors_cooldown_bars_after_exit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             dataset_path = _write_walk_forward_dataset(
@@ -742,7 +915,16 @@ def _direction_feature(feature_id: str, timestamp: str):
     )
 
 
-def _typed_feature(feature_id: str, timestamp: str, *, indicator_id: str, feature_type: str, name: str, value):
+def _typed_feature(
+    feature_id: str,
+    timestamp: str,
+    *,
+    indicator_id: str,
+    feature_type: str,
+    name: str,
+    value,
+    metadata=None,
+):
     return {
         "id": feature_id,
         "source": "tradingview",
@@ -753,6 +935,7 @@ def _typed_feature(feature_id: str, timestamp: str, *, indicator_id: str, featur
         "availabilityTime": timestamp,
         "repaintingRisk": "confirmed",
         "value": value,
+        **({"metadata": metadata} if metadata is not None else {}),
     }
 
 

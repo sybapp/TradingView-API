@@ -103,7 +103,7 @@
     "datasetPath": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
     "reportCommand": "uv run python -m evaluator.nautilus_evaluator.luxalgo_report datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28 --run-registry runs/luxalgo-ict-smc-es-rth-5m",
     "runRegistryPath": "runs/luxalgo-ict-smc-es-rth-5m",
-    "searchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json"
+    "searchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-fb36aa2a21fa/search.json"
   },
   "search": {
     "actualTradeCount": 8,
@@ -220,7 +220,7 @@
         "minProfitableWindows": 0,
         "minTrades": 1
       },
-      "generatedCandidatesHash": "abf520448cdd9e34098405df85f932a35f9e30e17507476a3d64067755da0cec",
+      "generatedCandidatesHash": "f69ee13f389c8246da44a394c5c4612e895e3d10d30a2411cb5c4983699f1351",
       "optimizerConfig": {
         "maxCandidates": 4,
         "method": "deterministic",
@@ -237,8 +237,8 @@
         "trainingSessions": 1
       }
     },
-    "runRegistryRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/winning-run/run.json",
-    "searchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json",
+    "runRegistryRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-fb36aa2a21fa/winning-run/run.json",
+    "searchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-fb36aa2a21fa/search.json",
     "sessionWindows": [
       {
         "scoring": {
@@ -334,7 +334,7 @@
       }
     ],
     "status": "completed",
-    "strategySpecOrSearchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-3a785f22333b/search.json",
+    "strategySpecOrSearchRecord": "runs/luxalgo-ict-smc-es-rth-5m/searches/strategy-search-fb36aa2a21fa/search.json",
     "survivingCandidateCount": 1,
     "tradeComparisonThreshold": 30,
     "walkForward": {
@@ -384,7 +384,7 @@
         "recordType": "Nautilus Walk-Forward Validation",
         "requiredNautilusProvenance": true
       },
-      "sourceRunRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-1-walk-forward-9f58394604f7/run.json",
+      "sourceRunRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-1-walk-forward-311212277462/run.json",
       "strategyId": "walk-forward-selected-candidates",
       "strategySpec": {
         "candidateStrategySpecs": [
@@ -404,8 +404,17 @@
               {
                 "feature": {
                   "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
                   "name": "bullish_liquidity_zone_touch_entry",
-                  "type": "signal"
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
                 },
                 "side": "long",
                 "type": "feature_equals",
@@ -430,16 +439,15 @@
             "parameters": {
               "confirmationMode": "touch",
               "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
               "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
               "exits_maxBarsInTrade": 24,
               "exits_reverseSignalRules_0_feature_name": "bearish_bos",
               "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
               "liquidityZoneType": "order_block",
               "maxBarsAfterStructureEvent": 6,
-              "parameters_confirmationMode": "touch",
-              "parameters_liquidityZoneType": "order_block",
-              "parameters_maxBarsAfterStructureEvent": 6,
-              "parameters_zonePreference": "nearest-any",
               "riskControls_cooldownBarsAfterExit": 0,
               "riskControls_stopLossTicks": 8,
               "templateChoiceIndex": 1,
@@ -504,8 +512,17 @@
               {
                 "feature": {
                   "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
                   "name": "bullish_liquidity_zone_touch_entry",
-                  "type": "signal"
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
                 },
                 "side": "long",
                 "type": "feature_equals",
@@ -530,16 +547,15 @@
             "parameters": {
               "confirmationMode": "touch",
               "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
               "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
               "exits_maxBarsInTrade": 48,
               "exits_reverseSignalRules_0_feature_name": "bearish_bos",
               "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
               "liquidityZoneType": "order_block",
               "maxBarsAfterStructureEvent": 6,
-              "parameters_confirmationMode": "touch",
-              "parameters_liquidityZoneType": "order_block",
-              "parameters_maxBarsAfterStructureEvent": 6,
-              "parameters_zonePreference": "nearest-any",
               "riskControls_cooldownBarsAfterExit": 0,
               "riskControls_stopLossTicks": 8,
               "templateChoiceIndex": 2,
@@ -604,8 +620,17 @@
               {
                 "feature": {
                   "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
                   "name": "bullish_liquidity_zone_touch_entry",
-                  "type": "signal"
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
                 },
                 "side": "long",
                 "type": "feature_equals",
@@ -630,16 +655,15 @@
             "parameters": {
               "confirmationMode": "touch",
               "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
               "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
               "exits_maxBarsInTrade": 24,
               "exits_reverseSignalRules_0_feature_name": "bearish_bos",
               "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
               "liquidityZoneType": "order_block",
               "maxBarsAfterStructureEvent": 6,
-              "parameters_confirmationMode": "touch",
-              "parameters_liquidityZoneType": "order_block",
-              "parameters_maxBarsAfterStructureEvent": 6,
-              "parameters_zonePreference": "nearest-any",
               "riskControls_cooldownBarsAfterExit": 0,
               "riskControls_stopLossTicks": 12,
               "templateChoiceIndex": 3,
@@ -704,8 +728,17 @@
               {
                 "feature": {
                   "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
                   "name": "bullish_liquidity_zone_touch_entry",
-                  "type": "signal"
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
                 },
                 "side": "long",
                 "type": "feature_equals",
@@ -730,16 +763,15 @@
             "parameters": {
               "confirmationMode": "touch",
               "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
               "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
               "exits_maxBarsInTrade": 48,
               "exits_reverseSignalRules_0_feature_name": "bearish_bos",
               "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
               "liquidityZoneType": "order_block",
               "maxBarsAfterStructureEvent": 6,
-              "parameters_confirmationMode": "touch",
-              "parameters_liquidityZoneType": "order_block",
-              "parameters_maxBarsAfterStructureEvent": 6,
-              "parameters_zonePreference": "nearest-any",
               "riskControls_cooldownBarsAfterExit": 0,
               "riskControls_stopLossTicks": 12,
               "templateChoiceIndex": 4,

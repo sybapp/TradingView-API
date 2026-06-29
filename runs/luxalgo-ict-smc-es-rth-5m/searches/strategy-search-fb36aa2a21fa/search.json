@@ -1,0 +1,2328 @@
+{
+  "authoritative": true,
+  "bestRejectedCandidate": {
+    "candidateId": "candidate-4",
+    "diagnosticOnly": true,
+    "fitness": {
+      "rankingInputs": {
+        "costToGrossRatio": 0.1736111111111111,
+        "grossPnl": 28800,
+        "maxDrawdown": 0,
+        "netPnl": 23800,
+        "outOfSampleSharpe": 5950.0,
+        "profitableWindowRatio": 1.0,
+        "profitableWindows": 4,
+        "slippageCosts": 1000,
+        "totalCosts": 5000,
+        "tradeCount": 8
+      },
+      "rejectionReasons": [],
+      "score": 5950.0,
+      "survivalChecks": {
+        "minProfitableWindows": {
+          "actual": 4,
+          "passed": true,
+          "required": 0
+        },
+        "minTrades": {
+          "actual": 8,
+          "passed": true,
+          "required": 1
+        }
+      },
+      "survived": true
+    },
+    "objectiveValue": 5950.0,
+    "strategyId": "luxalgo-ict-smc-long-4",
+    "strategySpec": {
+      "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+      "entryRules": [
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "name": "bullish_bos",
+            "type": "signal"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        },
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "maxBarsAfterStructureEvent": 6,
+            "metadata": {
+              "provenance": {
+                "selectedZone": {
+                  "kind": "order_block"
+                }
+              }
+            },
+            "name": "bullish_liquidity_zone_touch_entry",
+            "type": "signal",
+            "zonePreference": "nearest-any"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        }
+      ],
+      "exits": {
+        "maxBarsInTrade": 48,
+        "reverseSignalRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bearish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {
+        "confirmationMode": "touch",
+        "entryRules_0_feature_name": "bullish_bos",
+        "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+        "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+        "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+        "entryRules_1_feature_zonePreference": "nearest-any",
+        "exits_maxBarsInTrade": 48,
+        "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+        "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+        "liquidityZoneType": "order_block",
+        "maxBarsAfterStructureEvent": 6,
+        "riskControls_cooldownBarsAfterExit": 0,
+        "riskControls_stopLossTicks": 12,
+        "templateChoiceIndex": 4,
+        "templateId": "luxalgo-ict-smc-long",
+        "zonePreference": "nearest-any"
+      },
+      "riskControls": {
+        "cooldownBarsAfterExit": 0,
+        "flatBeforeCloseMinutes": 5,
+        "intradayFlat": true,
+        "stopLossTicks": 12,
+        "takeProfitTicks": 100
+      },
+      "schemaVersion": 1,
+      "sizing": {
+        "quantity": 1,
+        "type": "fixed"
+      },
+      "strategyId": "luxalgo-ict-smc-long-4",
+      "tunableParameters": {
+        "confirmationModes": [
+          "touch"
+        ],
+        "cooldownBarsAfterExit": [
+          0
+        ],
+        "eventTypes": [
+          "bos"
+        ],
+        "maxBarsAfterStructureEvent": [
+          6
+        ],
+        "maxBarsInTrade": [
+          24,
+          48
+        ],
+        "stopLossTicks": [
+          8,
+          12
+        ],
+        "zonePreferences": [
+          "nearest-any"
+        ],
+        "zoneTypes": [
+          "order_block"
+        ]
+      }
+    },
+    "totalTradeCount": 8,
+    "tradeComparison": {
+      "actual": 8,
+      "status": "below_threshold",
+      "threshold": 30
+    },
+    "trialNumber": null,
+    "trialParameters": {
+      "confirmationMode": "touch",
+      "entryRules_0_feature_name": "bullish_bos",
+      "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+      "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+      "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+      "entryRules_1_feature_zonePreference": "nearest-any",
+      "exits_maxBarsInTrade": 48,
+      "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+      "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+      "liquidityZoneType": "order_block",
+      "maxBarsAfterStructureEvent": 6,
+      "riskControls_cooldownBarsAfterExit": 0,
+      "riskControls_stopLossTicks": 12,
+      "templateChoiceIndex": 4,
+      "templateId": "luxalgo-ict-smc-long",
+      "zonePreference": "nearest-any"
+    }
+  },
+  "costModel": {
+    "fixedFee": 2.5,
+    "slippageTicks": 1,
+    "tickSize": 0.25
+  },
+  "dataset": {
+    "artifacts": {
+      "snapshot": "dataset"
+    },
+    "bar": {
+      "interval": "5m",
+      "priceScale": 100,
+      "volumeUnit": "contracts"
+    },
+    "collectedAt": "2026-06-28T12:00:00.000Z",
+    "datasetId": "es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+    "path": "datasets/es-rth-5m-luxalgo-ict-smc-validation-2026-06-28",
+    "schemaVersion": 1,
+    "session": {
+      "end": "16:00",
+      "flatBeforeCloseMinutes": 5,
+      "name": "RTH",
+      "sessions": [
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-22T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-22T19:55:00.000Z",
+          "id": "2026-06-22",
+          "lastBarTime": "2026-06-22T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-23T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-23T19:55:00.000Z",
+          "id": "2026-06-23",
+          "lastBarTime": "2026-06-23T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-24T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-24T19:55:00.000Z",
+          "id": "2026-06-24",
+          "lastBarTime": "2026-06-24T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-25T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-25T19:55:00.000Z",
+          "id": "2026-06-25",
+          "lastBarTime": "2026-06-25T19:55:00.000Z"
+        },
+        {
+          "barCount": 78,
+          "firstBarTime": "2026-06-26T13:30:00.000Z",
+          "flatBeforeCloseTime": "2026-06-26T19:55:00.000Z",
+          "id": "2026-06-26",
+          "lastBarTime": "2026-06-26T19:55:00.000Z"
+        }
+      ],
+      "start": "09:30",
+      "timezone": "America/New_York"
+    },
+    "source": "tradingview",
+    "symbol": {
+      "assetClass": "equity_index_futures",
+      "root": "ES",
+      "ticker": "CME_MINI:ES1!"
+    }
+  },
+  "evaluatedSpecs": [
+    {
+      "candidateId": "candidate-1",
+      "fitness": {
+        "rankingInputs": {
+          "costToGrossRatio": 0.3786764705882353,
+          "grossPnl": 27200,
+          "maxDrawdown": 600,
+          "netPnl": 16900,
+          "outOfSampleSharpe": 4225.0,
+          "profitableWindowRatio": 1.0,
+          "profitableWindows": 4,
+          "slippageCosts": 2300,
+          "totalCosts": 10300,
+          "tradeCount": 16
+        },
+        "rejectionReasons": [],
+        "score": 4225.0,
+        "survivalChecks": {
+          "minProfitableWindows": {
+            "actual": 4,
+            "passed": true,
+            "required": 0
+          },
+          "minTrades": {
+            "actual": 16,
+            "passed": true,
+            "required": 1
+          }
+        },
+        "survived": true
+      },
+      "optimizerPhase": "evaluation",
+      "registryRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-1-walk-forward-ab0ed571c245/run.json",
+      "strategyId": "luxalgo-ict-smc-long-1",
+      "strategySpec": {
+        "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+        "entryRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bullish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          },
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "maxBarsAfterStructureEvent": 6,
+              "metadata": {
+                "provenance": {
+                  "selectedZone": {
+                    "kind": "order_block"
+                  }
+                }
+              },
+              "name": "bullish_liquidity_zone_touch_entry",
+              "type": "signal",
+              "zonePreference": "nearest-any"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ],
+        "exits": {
+          "maxBarsInTrade": 24,
+          "reverseSignalRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bearish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ]
+        },
+        "parameters": {
+          "confirmationMode": "touch",
+          "entryRules_0_feature_name": "bullish_bos",
+          "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+          "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+          "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+          "entryRules_1_feature_zonePreference": "nearest-any",
+          "exits_maxBarsInTrade": 24,
+          "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "liquidityZoneType": "order_block",
+          "maxBarsAfterStructureEvent": 6,
+          "riskControls_cooldownBarsAfterExit": 0,
+          "riskControls_stopLossTicks": 8,
+          "templateChoiceIndex": 1,
+          "templateId": "luxalgo-ict-smc-long",
+          "zonePreference": "nearest-any"
+        },
+        "riskControls": {
+          "cooldownBarsAfterExit": 0,
+          "flatBeforeCloseMinutes": 5,
+          "intradayFlat": true,
+          "stopLossTicks": 8,
+          "takeProfitTicks": 100
+        },
+        "schemaVersion": 1,
+        "sizing": {
+          "quantity": 1,
+          "type": "fixed"
+        },
+        "strategyId": "luxalgo-ict-smc-long-1",
+        "tunableParameters": {
+          "confirmationModes": [
+            "touch"
+          ],
+          "cooldownBarsAfterExit": [
+            0
+          ],
+          "eventTypes": [
+            "bos"
+          ],
+          "maxBarsAfterStructureEvent": [
+            6
+          ],
+          "maxBarsInTrade": [
+            24,
+            48
+          ],
+          "stopLossTicks": [
+            8,
+            12
+          ],
+          "zonePreferences": [
+            "nearest-any"
+          ],
+          "zoneTypes": [
+            "order_block"
+          ]
+        }
+      },
+      "totalTradeCount": 16,
+      "tradeComparison": {
+        "actual": 16,
+        "status": "below_threshold",
+        "threshold": 30
+      }
+    },
+    {
+      "candidateId": "candidate-2",
+      "fitness": {
+        "rankingInputs": {
+          "costToGrossRatio": 0.27017543859649124,
+          "grossPnl": 28500,
+          "maxDrawdown": 600,
+          "netPnl": 20800,
+          "outOfSampleSharpe": 5200.0,
+          "profitableWindowRatio": 1.0,
+          "profitableWindows": 4,
+          "slippageCosts": 1700,
+          "totalCosts": 7700,
+          "tradeCount": 12
+        },
+        "rejectionReasons": [],
+        "score": 5200.0,
+        "survivalChecks": {
+          "minProfitableWindows": {
+            "actual": 4,
+            "passed": true,
+            "required": 0
+          },
+          "minTrades": {
+            "actual": 12,
+            "passed": true,
+            "required": 1
+          }
+        },
+        "survived": true
+      },
+      "optimizerPhase": "evaluation",
+      "registryRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-2-walk-forward-7d850b05c4d8/run.json",
+      "strategyId": "luxalgo-ict-smc-long-2",
+      "strategySpec": {
+        "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+        "entryRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bullish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          },
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "maxBarsAfterStructureEvent": 6,
+              "metadata": {
+                "provenance": {
+                  "selectedZone": {
+                    "kind": "order_block"
+                  }
+                }
+              },
+              "name": "bullish_liquidity_zone_touch_entry",
+              "type": "signal",
+              "zonePreference": "nearest-any"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ],
+        "exits": {
+          "maxBarsInTrade": 48,
+          "reverseSignalRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bearish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ]
+        },
+        "parameters": {
+          "confirmationMode": "touch",
+          "entryRules_0_feature_name": "bullish_bos",
+          "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+          "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+          "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+          "entryRules_1_feature_zonePreference": "nearest-any",
+          "exits_maxBarsInTrade": 48,
+          "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "liquidityZoneType": "order_block",
+          "maxBarsAfterStructureEvent": 6,
+          "riskControls_cooldownBarsAfterExit": 0,
+          "riskControls_stopLossTicks": 8,
+          "templateChoiceIndex": 2,
+          "templateId": "luxalgo-ict-smc-long",
+          "zonePreference": "nearest-any"
+        },
+        "riskControls": {
+          "cooldownBarsAfterExit": 0,
+          "flatBeforeCloseMinutes": 5,
+          "intradayFlat": true,
+          "stopLossTicks": 8,
+          "takeProfitTicks": 100
+        },
+        "schemaVersion": 1,
+        "sizing": {
+          "quantity": 1,
+          "type": "fixed"
+        },
+        "strategyId": "luxalgo-ict-smc-long-2",
+        "tunableParameters": {
+          "confirmationModes": [
+            "touch"
+          ],
+          "cooldownBarsAfterExit": [
+            0
+          ],
+          "eventTypes": [
+            "bos"
+          ],
+          "maxBarsAfterStructureEvent": [
+            6
+          ],
+          "maxBarsInTrade": [
+            24,
+            48
+          ],
+          "stopLossTicks": [
+            8,
+            12
+          ],
+          "zonePreferences": [
+            "nearest-any"
+          ],
+          "zoneTypes": [
+            "order_block"
+          ]
+        }
+      },
+      "totalTradeCount": 12,
+      "tradeComparison": {
+        "actual": 12,
+        "status": "below_threshold",
+        "threshold": 30
+      }
+    },
+    {
+      "candidateId": "candidate-3",
+      "fitness": {
+        "rankingInputs": {
+          "costToGrossRatio": 0.27017543859649124,
+          "grossPnl": 28500,
+          "maxDrawdown": 0,
+          "netPnl": 20800,
+          "outOfSampleSharpe": 5200.0,
+          "profitableWindowRatio": 1.0,
+          "profitableWindows": 4,
+          "slippageCosts": 1700,
+          "totalCosts": 7700,
+          "tradeCount": 12
+        },
+        "rejectionReasons": [],
+        "score": 5200.0,
+        "survivalChecks": {
+          "minProfitableWindows": {
+            "actual": 4,
+            "passed": true,
+            "required": 0
+          },
+          "minTrades": {
+            "actual": 12,
+            "passed": true,
+            "required": 1
+          }
+        },
+        "survived": true
+      },
+      "optimizerPhase": "evaluation",
+      "registryRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-3-walk-forward-ba3aa22596c8/run.json",
+      "strategyId": "luxalgo-ict-smc-long-3",
+      "strategySpec": {
+        "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+        "entryRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bullish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          },
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "maxBarsAfterStructureEvent": 6,
+              "metadata": {
+                "provenance": {
+                  "selectedZone": {
+                    "kind": "order_block"
+                  }
+                }
+              },
+              "name": "bullish_liquidity_zone_touch_entry",
+              "type": "signal",
+              "zonePreference": "nearest-any"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ],
+        "exits": {
+          "maxBarsInTrade": 24,
+          "reverseSignalRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bearish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ]
+        },
+        "parameters": {
+          "confirmationMode": "touch",
+          "entryRules_0_feature_name": "bullish_bos",
+          "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+          "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+          "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+          "entryRules_1_feature_zonePreference": "nearest-any",
+          "exits_maxBarsInTrade": 24,
+          "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "liquidityZoneType": "order_block",
+          "maxBarsAfterStructureEvent": 6,
+          "riskControls_cooldownBarsAfterExit": 0,
+          "riskControls_stopLossTicks": 12,
+          "templateChoiceIndex": 3,
+          "templateId": "luxalgo-ict-smc-long",
+          "zonePreference": "nearest-any"
+        },
+        "riskControls": {
+          "cooldownBarsAfterExit": 0,
+          "flatBeforeCloseMinutes": 5,
+          "intradayFlat": true,
+          "stopLossTicks": 12,
+          "takeProfitTicks": 100
+        },
+        "schemaVersion": 1,
+        "sizing": {
+          "quantity": 1,
+          "type": "fixed"
+        },
+        "strategyId": "luxalgo-ict-smc-long-3",
+        "tunableParameters": {
+          "confirmationModes": [
+            "touch"
+          ],
+          "cooldownBarsAfterExit": [
+            0
+          ],
+          "eventTypes": [
+            "bos"
+          ],
+          "maxBarsAfterStructureEvent": [
+            6
+          ],
+          "maxBarsInTrade": [
+            24,
+            48
+          ],
+          "stopLossTicks": [
+            8,
+            12
+          ],
+          "zonePreferences": [
+            "nearest-any"
+          ],
+          "zoneTypes": [
+            "order_block"
+          ]
+        }
+      },
+      "totalTradeCount": 12,
+      "tradeComparison": {
+        "actual": 12,
+        "status": "below_threshold",
+        "threshold": 30
+      }
+    },
+    {
+      "candidateId": "candidate-4",
+      "fitness": {
+        "rankingInputs": {
+          "costToGrossRatio": 0.1736111111111111,
+          "grossPnl": 28800,
+          "maxDrawdown": 0,
+          "netPnl": 23800,
+          "outOfSampleSharpe": 5950.0,
+          "profitableWindowRatio": 1.0,
+          "profitableWindows": 4,
+          "slippageCosts": 1000,
+          "totalCosts": 5000,
+          "tradeCount": 8
+        },
+        "rejectionReasons": [],
+        "score": 5950.0,
+        "survivalChecks": {
+          "minProfitableWindows": {
+            "actual": 4,
+            "passed": true,
+            "required": 0
+          },
+          "minTrades": {
+            "actual": 8,
+            "passed": true,
+            "required": 1
+          }
+        },
+        "survived": true
+      },
+      "optimizerPhase": "evaluation",
+      "registryRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-4-walk-forward-97eb48f3b8f9/run.json",
+      "strategyId": "luxalgo-ict-smc-long-4",
+      "strategySpec": {
+        "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+        "entryRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bullish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          },
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "maxBarsAfterStructureEvent": 6,
+              "metadata": {
+                "provenance": {
+                  "selectedZone": {
+                    "kind": "order_block"
+                  }
+                }
+              },
+              "name": "bullish_liquidity_zone_touch_entry",
+              "type": "signal",
+              "zonePreference": "nearest-any"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ],
+        "exits": {
+          "maxBarsInTrade": 48,
+          "reverseSignalRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bearish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ]
+        },
+        "parameters": {
+          "confirmationMode": "touch",
+          "entryRules_0_feature_name": "bullish_bos",
+          "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+          "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+          "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+          "entryRules_1_feature_zonePreference": "nearest-any",
+          "exits_maxBarsInTrade": 48,
+          "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+          "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+          "liquidityZoneType": "order_block",
+          "maxBarsAfterStructureEvent": 6,
+          "riskControls_cooldownBarsAfterExit": 0,
+          "riskControls_stopLossTicks": 12,
+          "templateChoiceIndex": 4,
+          "templateId": "luxalgo-ict-smc-long",
+          "zonePreference": "nearest-any"
+        },
+        "riskControls": {
+          "cooldownBarsAfterExit": 0,
+          "flatBeforeCloseMinutes": 5,
+          "intradayFlat": true,
+          "stopLossTicks": 12,
+          "takeProfitTicks": 100
+        },
+        "schemaVersion": 1,
+        "sizing": {
+          "quantity": 1,
+          "type": "fixed"
+        },
+        "strategyId": "luxalgo-ict-smc-long-4",
+        "tunableParameters": {
+          "confirmationModes": [
+            "touch"
+          ],
+          "cooldownBarsAfterExit": [
+            0
+          ],
+          "eventTypes": [
+            "bos"
+          ],
+          "maxBarsAfterStructureEvent": [
+            6
+          ],
+          "maxBarsInTrade": [
+            24,
+            48
+          ],
+          "stopLossTicks": [
+            8,
+            12
+          ],
+          "zonePreferences": [
+            "nearest-any"
+          ],
+          "zoneTypes": [
+            "order_block"
+          ]
+        }
+      },
+      "totalTradeCount": 8,
+      "tradeComparison": {
+        "actual": 8,
+        "status": "below_threshold",
+        "threshold": 30
+      }
+    }
+  ],
+  "evaluatorVersion": "strategy-replay-v1",
+  "fitnessConstraints": {
+    "maxCostToGrossRatio": null,
+    "maxDrawdown": null,
+    "maxSlippageCosts": null,
+    "minProfitableWindowRatio": null,
+    "minProfitableWindows": 0,
+    "minTrades": 1
+  },
+  "generatedCandidates": [
+    {
+      "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+      "entryRules": [
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "name": "bullish_bos",
+            "type": "signal"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        },
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "maxBarsAfterStructureEvent": 6,
+            "metadata": {
+              "provenance": {
+                "selectedZone": {
+                  "kind": "order_block"
+                }
+              }
+            },
+            "name": "bullish_liquidity_zone_touch_entry",
+            "type": "signal",
+            "zonePreference": "nearest-any"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        }
+      ],
+      "exits": {
+        "maxBarsInTrade": 24,
+        "reverseSignalRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bearish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {
+        "confirmationMode": "touch",
+        "entryRules_0_feature_name": "bullish_bos",
+        "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+        "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+        "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+        "entryRules_1_feature_zonePreference": "nearest-any",
+        "exits_maxBarsInTrade": 24,
+        "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+        "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+        "liquidityZoneType": "order_block",
+        "maxBarsAfterStructureEvent": 6,
+        "riskControls_cooldownBarsAfterExit": 0,
+        "riskControls_stopLossTicks": 8,
+        "templateChoiceIndex": 1,
+        "templateId": "luxalgo-ict-smc-long",
+        "zonePreference": "nearest-any"
+      },
+      "riskControls": {
+        "cooldownBarsAfterExit": 0,
+        "flatBeforeCloseMinutes": 5,
+        "intradayFlat": true,
+        "stopLossTicks": 8,
+        "takeProfitTicks": 100
+      },
+      "schemaVersion": 1,
+      "sizing": {
+        "quantity": 1,
+        "type": "fixed"
+      },
+      "strategyId": "luxalgo-ict-smc-long-1",
+      "tunableParameters": {
+        "confirmationModes": [
+          "touch"
+        ],
+        "cooldownBarsAfterExit": [
+          0
+        ],
+        "eventTypes": [
+          "bos"
+        ],
+        "maxBarsAfterStructureEvent": [
+          6
+        ],
+        "maxBarsInTrade": [
+          24,
+          48
+        ],
+        "stopLossTicks": [
+          8,
+          12
+        ],
+        "zonePreferences": [
+          "nearest-any"
+        ],
+        "zoneTypes": [
+          "order_block"
+        ]
+      }
+    },
+    {
+      "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+      "entryRules": [
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "name": "bullish_bos",
+            "type": "signal"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        },
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "maxBarsAfterStructureEvent": 6,
+            "metadata": {
+              "provenance": {
+                "selectedZone": {
+                  "kind": "order_block"
+                }
+              }
+            },
+            "name": "bullish_liquidity_zone_touch_entry",
+            "type": "signal",
+            "zonePreference": "nearest-any"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        }
+      ],
+      "exits": {
+        "maxBarsInTrade": 48,
+        "reverseSignalRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bearish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {
+        "confirmationMode": "touch",
+        "entryRules_0_feature_name": "bullish_bos",
+        "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+        "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+        "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+        "entryRules_1_feature_zonePreference": "nearest-any",
+        "exits_maxBarsInTrade": 48,
+        "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+        "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+        "liquidityZoneType": "order_block",
+        "maxBarsAfterStructureEvent": 6,
+        "riskControls_cooldownBarsAfterExit": 0,
+        "riskControls_stopLossTicks": 8,
+        "templateChoiceIndex": 2,
+        "templateId": "luxalgo-ict-smc-long",
+        "zonePreference": "nearest-any"
+      },
+      "riskControls": {
+        "cooldownBarsAfterExit": 0,
+        "flatBeforeCloseMinutes": 5,
+        "intradayFlat": true,
+        "stopLossTicks": 8,
+        "takeProfitTicks": 100
+      },
+      "schemaVersion": 1,
+      "sizing": {
+        "quantity": 1,
+        "type": "fixed"
+      },
+      "strategyId": "luxalgo-ict-smc-long-2",
+      "tunableParameters": {
+        "confirmationModes": [
+          "touch"
+        ],
+        "cooldownBarsAfterExit": [
+          0
+        ],
+        "eventTypes": [
+          "bos"
+        ],
+        "maxBarsAfterStructureEvent": [
+          6
+        ],
+        "maxBarsInTrade": [
+          24,
+          48
+        ],
+        "stopLossTicks": [
+          8,
+          12
+        ],
+        "zonePreferences": [
+          "nearest-any"
+        ],
+        "zoneTypes": [
+          "order_block"
+        ]
+      }
+    },
+    {
+      "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+      "entryRules": [
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "name": "bullish_bos",
+            "type": "signal"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        },
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "maxBarsAfterStructureEvent": 6,
+            "metadata": {
+              "provenance": {
+                "selectedZone": {
+                  "kind": "order_block"
+                }
+              }
+            },
+            "name": "bullish_liquidity_zone_touch_entry",
+            "type": "signal",
+            "zonePreference": "nearest-any"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        }
+      ],
+      "exits": {
+        "maxBarsInTrade": 24,
+        "reverseSignalRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bearish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {
+        "confirmationMode": "touch",
+        "entryRules_0_feature_name": "bullish_bos",
+        "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+        "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+        "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+        "entryRules_1_feature_zonePreference": "nearest-any",
+        "exits_maxBarsInTrade": 24,
+        "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+        "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+        "liquidityZoneType": "order_block",
+        "maxBarsAfterStructureEvent": 6,
+        "riskControls_cooldownBarsAfterExit": 0,
+        "riskControls_stopLossTicks": 12,
+        "templateChoiceIndex": 3,
+        "templateId": "luxalgo-ict-smc-long",
+        "zonePreference": "nearest-any"
+      },
+      "riskControls": {
+        "cooldownBarsAfterExit": 0,
+        "flatBeforeCloseMinutes": 5,
+        "intradayFlat": true,
+        "stopLossTicks": 12,
+        "takeProfitTicks": 100
+      },
+      "schemaVersion": 1,
+      "sizing": {
+        "quantity": 1,
+        "type": "fixed"
+      },
+      "strategyId": "luxalgo-ict-smc-long-3",
+      "tunableParameters": {
+        "confirmationModes": [
+          "touch"
+        ],
+        "cooldownBarsAfterExit": [
+          0
+        ],
+        "eventTypes": [
+          "bos"
+        ],
+        "maxBarsAfterStructureEvent": [
+          6
+        ],
+        "maxBarsInTrade": [
+          24,
+          48
+        ],
+        "stopLossTicks": [
+          8,
+          12
+        ],
+        "zonePreferences": [
+          "nearest-any"
+        ],
+        "zoneTypes": [
+          "order_block"
+        ]
+      }
+    },
+    {
+      "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+      "entryRules": [
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "name": "bullish_bos",
+            "type": "signal"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        },
+        {
+          "feature": {
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "maxBarsAfterStructureEvent": 6,
+            "metadata": {
+              "provenance": {
+                "selectedZone": {
+                  "kind": "order_block"
+                }
+              }
+            },
+            "name": "bullish_liquidity_zone_touch_entry",
+            "type": "signal",
+            "zonePreference": "nearest-any"
+          },
+          "side": "long",
+          "type": "feature_equals",
+          "value": true
+        }
+      ],
+      "exits": {
+        "maxBarsInTrade": 48,
+        "reverseSignalRules": [
+          {
+            "feature": {
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "name": "bearish_bos",
+              "type": "signal"
+            },
+            "side": "long",
+            "type": "feature_equals",
+            "value": true
+          }
+        ]
+      },
+      "parameters": {
+        "confirmationMode": "touch",
+        "entryRules_0_feature_name": "bullish_bos",
+        "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+        "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+        "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+        "entryRules_1_feature_zonePreference": "nearest-any",
+        "exits_maxBarsInTrade": 48,
+        "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+        "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+        "liquidityZoneType": "order_block",
+        "maxBarsAfterStructureEvent": 6,
+        "riskControls_cooldownBarsAfterExit": 0,
+        "riskControls_stopLossTicks": 12,
+        "templateChoiceIndex": 4,
+        "templateId": "luxalgo-ict-smc-long",
+        "zonePreference": "nearest-any"
+      },
+      "riskControls": {
+        "cooldownBarsAfterExit": 0,
+        "flatBeforeCloseMinutes": 5,
+        "intradayFlat": true,
+        "stopLossTicks": 12,
+        "takeProfitTicks": 100
+      },
+      "schemaVersion": 1,
+      "sizing": {
+        "quantity": 1,
+        "type": "fixed"
+      },
+      "strategyId": "luxalgo-ict-smc-long-4",
+      "tunableParameters": {
+        "confirmationModes": [
+          "touch"
+        ],
+        "cooldownBarsAfterExit": [
+          0
+        ],
+        "eventTypes": [
+          "bos"
+        ],
+        "maxBarsAfterStructureEvent": [
+          6
+        ],
+        "maxBarsInTrade": [
+          24,
+          48
+        ],
+        "stopLossTicks": [
+          8,
+          12
+        ],
+        "zonePreferences": [
+          "nearest-any"
+        ],
+        "zoneTypes": [
+          "order_block"
+        ]
+      }
+    }
+  ],
+  "optimizerConfig": {
+    "maxCandidates": 4,
+    "method": "deterministic",
+    "seed": 0
+  },
+  "ranking": [
+    "walk-forward-selected-candidates"
+  ],
+  "recordType": "Nautilus Validation Search",
+  "rejectedCandidates": [],
+  "reproducibilityInputs": {
+    "costModel": {
+      "fixedFee": 2.5,
+      "slippageTicks": 1,
+      "tickSize": 0.25
+    },
+    "datasetSnapshot": "dataset",
+    "fitnessConstraints": {
+      "maxCostToGrossRatio": null,
+      "maxDrawdown": null,
+      "maxSlippageCosts": null,
+      "minProfitableWindowRatio": null,
+      "minProfitableWindows": 0,
+      "minTrades": 1
+    },
+    "generatedCandidatesHash": "f69ee13f389c8246da44a394c5c4612e895e3d10d30a2411cb5c4983699f1351",
+    "optimizerConfig": {
+      "maxCandidates": 4,
+      "method": "deterministic",
+      "seed": 0
+    },
+    "sampler": {
+      "name": "none",
+      "seed": 0
+    },
+    "trialsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "walkForward": {
+      "scoringSessions": 1,
+      "stepSessions": 1,
+      "trainingSessions": 1
+    }
+  },
+  "runId": "strategy-search-fb36aa2a21fa",
+  "sampler": {
+    "name": "none",
+    "seed": 0
+  },
+  "status": "completed",
+  "survivingCandidates": [
+    {
+      "candidateId": "training-window-selection",
+      "fitness": {
+        "rankingInputs": {
+          "costToGrossRatio": 0.1736111111111111,
+          "grossPnl": 28800,
+          "maxDrawdown": 0,
+          "netPnl": 23800,
+          "outOfSampleSharpe": 5950.0,
+          "profitableWindowRatio": 1.0,
+          "profitableWindows": 4,
+          "slippageCosts": 1000,
+          "totalCosts": 5000,
+          "tradeCount": 8
+        },
+        "rejectionReasons": [],
+        "score": 5950.0,
+        "survivalChecks": {
+          "minProfitableWindows": {
+            "actual": 4,
+            "passed": true,
+            "required": 0
+          },
+          "minTrades": {
+            "actual": 8,
+            "passed": true,
+            "required": 1
+          }
+        },
+        "survived": true
+      },
+      "optimizerPhase": "training-window-selection",
+      "registryRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-1-walk-forward-311212277462/run.json",
+      "strategyId": "walk-forward-selected-candidates",
+      "strategySpec": {
+        "candidateStrategySpecs": [
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 24,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
+              "exits_maxBarsInTrade": 24,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 8,
+              "templateChoiceIndex": 1,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 8,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-1",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          },
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 48,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
+              "exits_maxBarsInTrade": 48,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 8,
+              "templateChoiceIndex": 2,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 8,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-2",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          },
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 24,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
+              "exits_maxBarsInTrade": 24,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 12,
+              "templateChoiceIndex": 3,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 12,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-3",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          },
+          {
+            "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+            "entryRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bullish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              },
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "maxBarsAfterStructureEvent": 6,
+                  "metadata": {
+                    "provenance": {
+                      "selectedZone": {
+                        "kind": "order_block"
+                      }
+                    }
+                  },
+                  "name": "bullish_liquidity_zone_touch_entry",
+                  "type": "signal",
+                  "zonePreference": "nearest-any"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ],
+            "exits": {
+              "maxBarsInTrade": 48,
+              "reverseSignalRules": [
+                {
+                  "feature": {
+                    "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                    "name": "bearish_bos",
+                    "type": "signal"
+                  },
+                  "side": "long",
+                  "type": "feature_equals",
+                  "value": true
+                }
+              ]
+            },
+            "parameters": {
+              "confirmationMode": "touch",
+              "entryRules_0_feature_name": "bullish_bos",
+              "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+              "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+              "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+              "entryRules_1_feature_zonePreference": "nearest-any",
+              "exits_maxBarsInTrade": 48,
+              "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+              "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+              "liquidityZoneType": "order_block",
+              "maxBarsAfterStructureEvent": 6,
+              "riskControls_cooldownBarsAfterExit": 0,
+              "riskControls_stopLossTicks": 12,
+              "templateChoiceIndex": 4,
+              "templateId": "luxalgo-ict-smc-long",
+              "zonePreference": "nearest-any"
+            },
+            "riskControls": {
+              "cooldownBarsAfterExit": 0,
+              "flatBeforeCloseMinutes": 5,
+              "intradayFlat": true,
+              "stopLossTicks": 12,
+              "takeProfitTicks": 100
+            },
+            "schemaVersion": 1,
+            "sizing": {
+              "quantity": 1,
+              "type": "fixed"
+            },
+            "strategyId": "luxalgo-ict-smc-long-4",
+            "tunableParameters": {
+              "confirmationModes": [
+                "touch"
+              ],
+              "cooldownBarsAfterExit": [
+                0
+              ],
+              "eventTypes": [
+                "bos"
+              ],
+              "maxBarsAfterStructureEvent": [
+                6
+              ],
+              "maxBarsInTrade": [
+                24,
+                48
+              ],
+              "stopLossTicks": [
+                8,
+                12
+              ],
+              "zonePreferences": [
+                "nearest-any"
+              ],
+              "zoneTypes": [
+                "order_block"
+              ]
+            }
+          }
+        ],
+        "selectionStrategy": "training-window-candidate-selection"
+      },
+      "totalTradeCount": 8,
+      "tradeComparison": {
+        "actual": 8,
+        "status": "below_threshold",
+        "threshold": 30
+      }
+    }
+  ],
+  "trials": [],
+  "walkForward": {
+    "config": {
+      "scoringSessions": 1,
+      "stepSessions": 1,
+      "trainingSessions": 1
+    }
+  },
+  "winningRun": {
+    "artifacts": {
+      "ordersByWindow": "winning-run/orders-by-window.json",
+      "runRecord": "winning-run/run.json"
+    },
+    "candidateId": "training-window-selection",
+    "fitness": {
+      "rankingInputs": {
+        "costToGrossRatio": 0.1736111111111111,
+        "grossPnl": 28800,
+        "maxDrawdown": 0,
+        "netPnl": 23800,
+        "outOfSampleSharpe": 5950.0,
+        "profitableWindowRatio": 1.0,
+        "profitableWindows": 4,
+        "slippageCosts": 1000,
+        "totalCosts": 5000,
+        "tradeCount": 8
+      },
+      "rejectionReasons": [],
+      "score": 5950.0,
+      "survivalChecks": {
+        "minProfitableWindows": {
+          "actual": 4,
+          "passed": true,
+          "required": 0
+        },
+        "minTrades": {
+          "actual": 8,
+          "passed": true,
+          "required": 1
+        }
+      },
+      "survived": true
+    },
+    "objectiveValue": 5950.0,
+    "provenance": {
+      "recordType": "Nautilus Walk-Forward Validation",
+      "requiredNautilusProvenance": true
+    },
+    "sourceRunRecord": "runs/luxalgo-ict-smc-es-rth-5m/luxalgo-ict-smc-long-1-walk-forward-311212277462/run.json",
+    "strategyId": "walk-forward-selected-candidates",
+    "strategySpec": {
+      "candidateStrategySpecs": [
+        {
+          "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+          "entryRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bullish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            },
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "maxBarsAfterStructureEvent": 6,
+                "metadata": {
+                  "provenance": {
+                    "selectedZone": {
+                      "kind": "order_block"
+                    }
+                  }
+                },
+                "name": "bullish_liquidity_zone_touch_entry",
+                "type": "signal",
+                "zonePreference": "nearest-any"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ],
+          "exits": {
+            "maxBarsInTrade": 24,
+            "reverseSignalRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bearish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ]
+          },
+          "parameters": {
+            "confirmationMode": "touch",
+            "entryRules_0_feature_name": "bullish_bos",
+            "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+            "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+            "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+            "entryRules_1_feature_zonePreference": "nearest-any",
+            "exits_maxBarsInTrade": 24,
+            "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "liquidityZoneType": "order_block",
+            "maxBarsAfterStructureEvent": 6,
+            "riskControls_cooldownBarsAfterExit": 0,
+            "riskControls_stopLossTicks": 8,
+            "templateChoiceIndex": 1,
+            "templateId": "luxalgo-ict-smc-long",
+            "zonePreference": "nearest-any"
+          },
+          "riskControls": {
+            "cooldownBarsAfterExit": 0,
+            "flatBeforeCloseMinutes": 5,
+            "intradayFlat": true,
+            "stopLossTicks": 8,
+            "takeProfitTicks": 100
+          },
+          "schemaVersion": 1,
+          "sizing": {
+            "quantity": 1,
+            "type": "fixed"
+          },
+          "strategyId": "luxalgo-ict-smc-long-1",
+          "tunableParameters": {
+            "confirmationModes": [
+              "touch"
+            ],
+            "cooldownBarsAfterExit": [
+              0
+            ],
+            "eventTypes": [
+              "bos"
+            ],
+            "maxBarsAfterStructureEvent": [
+              6
+            ],
+            "maxBarsInTrade": [
+              24,
+              48
+            ],
+            "stopLossTicks": [
+              8,
+              12
+            ],
+            "zonePreferences": [
+              "nearest-any"
+            ],
+            "zoneTypes": [
+              "order_block"
+            ]
+          }
+        },
+        {
+          "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+          "entryRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bullish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            },
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "maxBarsAfterStructureEvent": 6,
+                "metadata": {
+                  "provenance": {
+                    "selectedZone": {
+                      "kind": "order_block"
+                    }
+                  }
+                },
+                "name": "bullish_liquidity_zone_touch_entry",
+                "type": "signal",
+                "zonePreference": "nearest-any"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ],
+          "exits": {
+            "maxBarsInTrade": 48,
+            "reverseSignalRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bearish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ]
+          },
+          "parameters": {
+            "confirmationMode": "touch",
+            "entryRules_0_feature_name": "bullish_bos",
+            "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+            "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+            "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+            "entryRules_1_feature_zonePreference": "nearest-any",
+            "exits_maxBarsInTrade": 48,
+            "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "liquidityZoneType": "order_block",
+            "maxBarsAfterStructureEvent": 6,
+            "riskControls_cooldownBarsAfterExit": 0,
+            "riskControls_stopLossTicks": 8,
+            "templateChoiceIndex": 2,
+            "templateId": "luxalgo-ict-smc-long",
+            "zonePreference": "nearest-any"
+          },
+          "riskControls": {
+            "cooldownBarsAfterExit": 0,
+            "flatBeforeCloseMinutes": 5,
+            "intradayFlat": true,
+            "stopLossTicks": 8,
+            "takeProfitTicks": 100
+          },
+          "schemaVersion": 1,
+          "sizing": {
+            "quantity": 1,
+            "type": "fixed"
+          },
+          "strategyId": "luxalgo-ict-smc-long-2",
+          "tunableParameters": {
+            "confirmationModes": [
+              "touch"
+            ],
+            "cooldownBarsAfterExit": [
+              0
+            ],
+            "eventTypes": [
+              "bos"
+            ],
+            "maxBarsAfterStructureEvent": [
+              6
+            ],
+            "maxBarsInTrade": [
+              24,
+              48
+            ],
+            "stopLossTicks": [
+              8,
+              12
+            ],
+            "zonePreferences": [
+              "nearest-any"
+            ],
+            "zoneTypes": [
+              "order_block"
+            ]
+          }
+        },
+        {
+          "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+          "entryRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bullish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            },
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "maxBarsAfterStructureEvent": 6,
+                "metadata": {
+                  "provenance": {
+                    "selectedZone": {
+                      "kind": "order_block"
+                    }
+                  }
+                },
+                "name": "bullish_liquidity_zone_touch_entry",
+                "type": "signal",
+                "zonePreference": "nearest-any"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ],
+          "exits": {
+            "maxBarsInTrade": 24,
+            "reverseSignalRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bearish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ]
+          },
+          "parameters": {
+            "confirmationMode": "touch",
+            "entryRules_0_feature_name": "bullish_bos",
+            "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+            "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+            "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+            "entryRules_1_feature_zonePreference": "nearest-any",
+            "exits_maxBarsInTrade": 24,
+            "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "liquidityZoneType": "order_block",
+            "maxBarsAfterStructureEvent": 6,
+            "riskControls_cooldownBarsAfterExit": 0,
+            "riskControls_stopLossTicks": 12,
+            "templateChoiceIndex": 3,
+            "templateId": "luxalgo-ict-smc-long",
+            "zonePreference": "nearest-any"
+          },
+          "riskControls": {
+            "cooldownBarsAfterExit": 0,
+            "flatBeforeCloseMinutes": 5,
+            "intradayFlat": true,
+            "stopLossTicks": 12,
+            "takeProfitTicks": 100
+          },
+          "schemaVersion": 1,
+          "sizing": {
+            "quantity": 1,
+            "type": "fixed"
+          },
+          "strategyId": "luxalgo-ict-smc-long-3",
+          "tunableParameters": {
+            "confirmationModes": [
+              "touch"
+            ],
+            "cooldownBarsAfterExit": [
+              0
+            ],
+            "eventTypes": [
+              "bos"
+            ],
+            "maxBarsAfterStructureEvent": [
+              6
+            ],
+            "maxBarsInTrade": [
+              24,
+              48
+            ],
+            "stopLossTicks": [
+              8,
+              12
+            ],
+            "zonePreferences": [
+              "nearest-any"
+            ],
+            "zoneTypes": [
+              "order_block"
+            ]
+          }
+        },
+        {
+          "description": "LuxAlgo ICT/SMC long template: bullish structure event plus bullish liquidity-zone confirmation, reverse bearish structure exit.",
+          "entryRules": [
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "name": "bullish_bos",
+                "type": "signal"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            },
+            {
+              "feature": {
+                "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                "maxBarsAfterStructureEvent": 6,
+                "metadata": {
+                  "provenance": {
+                    "selectedZone": {
+                      "kind": "order_block"
+                    }
+                  }
+                },
+                "name": "bullish_liquidity_zone_touch_entry",
+                "type": "signal",
+                "zonePreference": "nearest-any"
+              },
+              "side": "long",
+              "type": "feature_equals",
+              "value": true
+            }
+          ],
+          "exits": {
+            "maxBarsInTrade": 48,
+            "reverseSignalRules": [
+              {
+                "feature": {
+                  "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+                  "name": "bearish_bos",
+                  "type": "signal"
+                },
+                "side": "long",
+                "type": "feature_equals",
+                "value": true
+              }
+            ]
+          },
+          "parameters": {
+            "confirmationMode": "touch",
+            "entryRules_0_feature_name": "bullish_bos",
+            "entryRules_1_feature_maxBarsAfterStructureEvent": 6,
+            "entryRules_1_feature_metadata_provenance_selectedZone_kind": "order_block",
+            "entryRules_1_feature_name": "bullish_liquidity_zone_touch_entry",
+            "entryRules_1_feature_zonePreference": "nearest-any",
+            "exits_maxBarsInTrade": 48,
+            "exits_reverseSignalRules_0_feature_name": "bearish_bos",
+            "indicatorId": "PUB;6daafb2cabe6419d98ae25229d2327f8",
+            "liquidityZoneType": "order_block",
+            "maxBarsAfterStructureEvent": 6,
+            "riskControls_cooldownBarsAfterExit": 0,
+            "riskControls_stopLossTicks": 12,
+            "templateChoiceIndex": 4,
+            "templateId": "luxalgo-ict-smc-long",
+            "zonePreference": "nearest-any"
+          },
+          "riskControls": {
+            "cooldownBarsAfterExit": 0,
+            "flatBeforeCloseMinutes": 5,
+            "intradayFlat": true,
+            "stopLossTicks": 12,
+            "takeProfitTicks": 100
+          },
+          "schemaVersion": 1,
+          "sizing": {
+            "quantity": 1,
+            "type": "fixed"
+          },
+          "strategyId": "luxalgo-ict-smc-long-4",
+          "tunableParameters": {
+            "confirmationModes": [
+              "touch"
+            ],
+            "cooldownBarsAfterExit": [
+              0
+            ],
+            "eventTypes": [
+              "bos"
+            ],
+            "maxBarsAfterStructureEvent": [
+              6
+            ],
+            "maxBarsInTrade": [
+              24,
+              48
+            ],
+            "stopLossTicks": [
+              8,
+              12
+            ],
+            "zonePreferences": [
+              "nearest-any"
+            ],
+            "zoneTypes": [
+              "order_block"
+            ]
+          }
+        }
+      ],
+      "selectionStrategy": "training-window-candidate-selection"
+    },
+    "totalTradeCount": 8,
+    "tradeComparison": {
+      "actual": 8,
+      "status": "below_threshold",
+      "threshold": 30
+    },
+    "trialNumber": null,
+    "trialParameters": {
+      "selectedCandidates": [
+        {
+          "candidateId": "candidate-4",
+          "strategyId": "luxalgo-ict-smc-long-4",
+          "windowId": "wf-1"
+        },
+        {
+          "candidateId": "candidate-4",
+          "strategyId": "luxalgo-ict-smc-long-4",
+          "windowId": "wf-2"
+        },
+        {
+          "candidateId": "candidate-4",
+          "strategyId": "luxalgo-ict-smc-long-4",
+          "windowId": "wf-3"
+        },
+        {
+          "candidateId": "candidate-4",
+          "strategyId": "luxalgo-ict-smc-long-4",
+          "windowId": "wf-4"
+        }
+      ]
+    }
+  }
+}

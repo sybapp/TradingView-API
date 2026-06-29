@@ -357,6 +357,114 @@ class NautilusValidationTests(unittest.TestCase):
         self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "intraday-flat-before-close"])
         self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:30:00+00:00")
 
+    def test_nautilus_validation_honors_signal_provenance_selectors(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 100, high=100, low=100),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                            "maxBarsAfterStructureEvent": 1,
+                            "zonePreference": "prefer-FVG",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+            },
+            features=[
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:35:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_liquidity_zone_touch_entry",
+                    value=True,
+                    metadata={
+                        "provenance": {
+                            "structureEvent": {"availabilityTime": "2026-06-25T13:30:00.000Z"},
+                            "selectedZone": {"kind": "order_block"},
+                        }
+                    },
+                )
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+        )
+
+        self.assertEqual(result.orders, [])
+
+    def test_nautilus_validation_rejects_zone_signal_before_structure_provenance(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:45:00.000Z", 100, high=100, low=100),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                            "maxBarsAfterStructureEvent": 2,
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                ],
+                "exits": {"maxBarsInTrade": 1},
+            },
+            features=[
+                _typed_feature(
+                    "structure-entry",
+                    "2026-06-25T13:40:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                ),
+                _typed_feature(
+                    "zone-entry",
+                    "2026-06-25T13:35:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_liquidity_zone_touch_entry",
+                    value=True,
+                    metadata={
+                        "provenance": {
+                            "structureEvent": {"availabilityTime": "2026-06-25T13:40:00.000Z"},
+                            "selectedZone": {"kind": "order_block"},
+                        }
+                    },
+                ),
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+            session_end="13:50",
+        )
+
+        self.assertEqual(result.orders, [])
+
     def test_nautilus_validation_does_not_execute_pending_entry_across_rth_sessions(self):
         result = _run_tiny_validation(
             bars=[
@@ -559,7 +667,16 @@ def _direction_feature(feature_id: str, timestamp: str, value=1):
     )
 
 
-def _typed_feature(feature_id: str, timestamp: str, *, indicator_id: str, feature_type: str, name: str, value):
+def _typed_feature(
+    feature_id: str,
+    timestamp: str,
+    *,
+    indicator_id: str,
+    feature_type: str,
+    name: str,
+    value,
+    metadata=None,
+):
     return {
         "id": feature_id,
         "source": "tradingview",
@@ -570,6 +687,7 @@ def _typed_feature(feature_id: str, timestamp: str, *, indicator_id: str, featur
         "availabilityTime": timestamp,
         "repaintingRisk": "confirmed",
         "value": value,
+        **({"metadata": metadata} if metadata is not None else {}),
     }
 
 

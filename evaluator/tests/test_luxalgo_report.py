@@ -59,6 +59,7 @@ class LuxAlgoReportTests(unittest.TestCase):
             self.assertEqual(summary["search"]["comparisonStatus"], "smoke-only")
             self.assertEqual(summary["search"]["actualTradeCount"], 12)
             self.assertEqual(summary["dataset"]["bullishStructureEventSignalCount"], 1)
+            self.assertEqual(summary["dataset"]["liquidityZoneCounts"], {"order_block": 1})
             self.assertEqual(summary["dataset"]["rejectedOrAmbiguousDerivationCount"], 2)
             self.assertIn("Comparison status: `smoke-only`", render_markdown_report(summary))
 
@@ -81,6 +82,7 @@ def _write_dataset(dataset_path: Path) -> None:
     (dataset_path / "features.json").write_text(json.dumps([
         {"type": "label", "name": "BOS", "indicatorId": "LUX", "value": {}, "source": "tradingview", "id": "1", "eventTime": "2026-06-25T13:30:00.000Z", "availabilityTime": "2026-06-25T13:30:00.000Z", "repaintingRisk": "confirmed"},
         {"type": "box", "name": "bullish_order_block", "indicatorId": "LUX", "value": {"text": "Bullish OB"}, "source": "tradingview", "id": "2", "eventTime": "2026-06-25T13:30:00.000Z", "availabilityTime": "2026-06-25T13:30:00.000Z", "repaintingRisk": "confirmed"},
+        {"type": "box", "name": "global_zone", "indicatorId": "LUX", "value": {"text": "Global value"}, "source": "tradingview", "id": "2b", "eventTime": "2026-06-25T13:30:00.000Z", "availabilityTime": "2026-06-25T13:30:00.000Z", "repaintingRisk": "confirmed"},
         {"type": "signal", "name": "bullish_bos", "indicatorId": "LUX", "value": True, "source": "tradingview", "id": "3", "eventTime": "2026-06-25T13:30:00.000Z", "availabilityTime": "2026-06-25T13:30:00.000Z", "repaintingRisk": "confirmed"},
         {"type": "signal", "name": "bullish_liquidity_zone_touch_entry", "indicatorId": "LUX", "value": True, "source": "tradingview", "id": "4", "eventTime": "2026-06-25T13:30:00.000Z", "availabilityTime": "2026-06-25T13:30:00.000Z", "repaintingRisk": "confirmed"},
     ]), encoding="utf-8")

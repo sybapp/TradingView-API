@@ -137,7 +137,17 @@ def create_luxalgo_ict_smc_long_strategy_template(
         },
         "entryRules": [
             _signal_rule(config.indicator_id, "bullish_bos"),
-            _signal_rule(config.indicator_id, "bullish_liquidity_zone_touch_entry"),
+            _signal_rule(
+                config.indicator_id,
+                "bullish_liquidity_zone_touch_entry",
+                metadata={
+                    "provenance": {
+                        "selectedZone": {"kind": "order_block"},
+                    },
+                },
+                max_bars_after_structure_event=12,
+                zone_preference="nearest-any",
+            ),
         ],
         "exits": {
             "maxBarsInTrade": 24,
@@ -176,14 +186,13 @@ def create_luxalgo_ict_smc_long_strategy_template(
                 f"bullish_liquidity_zone_{mode}_entry"
                 for mode in config.confirmation_modes
             ],
+            "entryRules.1.feature.metadata.provenance.selectedZone.kind": list(config.zone_types),
+            "entryRules.1.feature.maxBarsAfterStructureEvent": list(config.max_bars_after_structure_event),
+            "entryRules.1.feature.zonePreference": list(config.zone_preferences),
             "exits.reverseSignalRules.0.feature.name": [
                 f"bearish_{event_type.lower()}"
                 for event_type in config.event_types
             ],
-            "parameters.liquidityZoneType": list(config.zone_types),
-            "parameters.zonePreference": list(config.zone_preferences),
-            "parameters.confirmationMode": list(config.confirmation_modes),
-            "parameters.maxBarsAfterStructureEvent": list(config.max_bars_after_structure_event),
             "riskControls.cooldownBarsAfterExit": list(config.cooldown_bars_after_exit),
             "riskControls.stopLossTicks": list(config.stop_loss_ticks),
             "exits.maxBarsInTrade": list(config.max_bars_in_trade),
@@ -596,21 +605,50 @@ def _template_candidate_specs(template: StrategyTemplate) -> List[JsonObject]:
         for path, value in zip(paths, values):
             _set_path(candidate, path, value)
             candidate["parameters"][path.replace(".", "_")] = value
+            _sync_template_parameter(candidate, path, value)
         candidates.append(candidate)
     return candidates
 
 
-def _signal_rule(indicator_id: str, name: str) -> JsonObject:
+def _signal_rule(
+    indicator_id: str,
+    name: str,
+    *,
+    metadata: Optional[Mapping[str, Any]] = None,
+    max_bars_after_structure_event: Optional[int] = None,
+    zone_preference: Optional[str] = None,
+) -> JsonObject:
+    feature: JsonObject = {
+        "indicatorId": indicator_id,
+        "type": "signal",
+        "name": name,
+    }
+    if metadata is not None:
+        feature["metadata"] = dict(metadata)
+    if max_bars_after_structure_event is not None:
+        feature["maxBarsAfterStructureEvent"] = max_bars_after_structure_event
+    if zone_preference is not None:
+        feature["zonePreference"] = zone_preference
     return {
         "type": "feature_equals",
-        "feature": {
-            "indicatorId": indicator_id,
-            "type": "signal",
-            "name": name,
-        },
+        "feature": feature,
         "value": True,
         "side": "long",
     }
+
+
+def _sync_template_parameter(candidate: JsonObject, path: str, value: Any) -> None:
+    if path == "entryRules.1.feature.metadata.provenance.selectedZone.kind":
+        candidate["parameters"]["liquidityZoneType"] = value
+    elif path == "entryRules.1.feature.maxBarsAfterStructureEvent":
+        candidate["parameters"]["maxBarsAfterStructureEvent"] = value
+    elif path == "entryRules.1.feature.zonePreference":
+        candidate["parameters"]["zonePreference"] = value
+    elif path == "entryRules.1.feature.name":
+        prefix = "bullish_liquidity_zone_"
+        suffix = "_entry"
+        if isinstance(value, str) and value.startswith(prefix) and value.endswith(suffix):
+            candidate["parameters"]["confirmationMode"] = value[len(prefix):-len(suffix)]
 
 
 def _sample_candidates(candidates: List[JsonObject], search_config: BoundedSearchConfig) -> List[JsonObject]:

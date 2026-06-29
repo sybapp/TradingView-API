@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 from typing import Any, Dict, Iterable, Mapping, Sequence
 
 from .search import (
@@ -325,9 +326,10 @@ def _count_by(values: Iterable[Any]) -> JsonObject:
 
 def _liquidity_zone_kind(feature: Mapping[str, Any]) -> str | None:
     text = f"{feature.get('name', '')} {feature.get('value', {}).get('text', '')}".lower()
-    if "fvg" in text or "fair_value_gap" in text or "fair value gap" in text:
+    tokens = set(re.findall(r"[a-z0-9]+", text))
+    if "fvg" in tokens or "fair_value_gap" in text or "fair value gap" in text:
         return "fair_value_gap"
-    if "ob" in text or "order_block" in text or "order block" in text:
+    if "ob" in tokens or "order_block" in text or "order block" in text:
         return "order_block"
     return None
 

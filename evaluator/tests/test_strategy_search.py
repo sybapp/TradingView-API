@@ -76,11 +76,19 @@ class StrategySearchTests(unittest.TestCase):
         self.assertEqual([rule.feature_type for rule in first.entry_rules], ["signal", "signal"])
         self.assertEqual(first.entry_rules[0].name, "bullish_bos")
         self.assertEqual(first.entry_rules[1].name, "bullish_liquidity_zone_touch_entry")
+        self.assertEqual(
+            specs[0]["entryRules"][1]["feature"]["metadata"]["provenance"]["selectedZone"]["kind"],
+            "order_block",
+        )
+        self.assertEqual(specs[0]["entryRules"][1]["feature"]["maxBarsAfterStructureEvent"], 4)
+        self.assertEqual(specs[0]["entryRules"][1]["feature"]["zonePreference"], "nearest-any")
+        self.assertEqual(specs[0]["parameters"]["confirmationMode"], "touch")
+        self.assertEqual(specs[0]["parameters"]["zonePreference"], "nearest-any")
         self.assertEqual(first.exits.reverse_signal_rules[0].name, "bearish_bos")
         self.assertEqual(first.risk_controls.cooldown_bars_after_exit, 0)
         self.assertEqual(specs[0]["parameters"]["liquidityZoneType"], "order_block")
-        self.assertIn("parameters.zonePreference", template.choices)
-        self.assertIn("parameters.maxBarsAfterStructureEvent", template.choices)
+        self.assertIn("entryRules.1.feature.zonePreference", template.choices)
+        self.assertIn("entryRules.1.feature.maxBarsAfterStructureEvent", template.choices)
         self.assertIn("riskControls.cooldownBarsAfterExit", template.choices)
         self.assertIn("riskControls.stopLossTicks", template.choices)
         self.assertIn("exits.maxBarsInTrade", template.choices)

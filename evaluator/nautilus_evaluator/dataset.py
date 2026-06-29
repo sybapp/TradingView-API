@@ -33,6 +33,7 @@ class FeatureRecord:
     availability_time: datetime
     repainting_risk: str
     value: Any
+    metadata: JsonObject
 
 
 @dataclass(frozen=True)
@@ -114,6 +115,7 @@ def _parse_feature(record: JsonObject) -> FeatureRecord:
         availability_time=_parse_timestamp(record["availabilityTime"]),
         repainting_risk=str(record["repaintingRisk"]),
         value=record["value"],
+        metadata=dict(record.get("metadata", {})),
     )
 
 
