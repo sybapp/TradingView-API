@@ -530,4 +530,122 @@ describe('TradingView collector', () => {
       },
     });
   });
+
+  it('exports a mocked ES RTH 15m collection as a valid dataset', async () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-15m-'));
+    const client = makeMockClient([
+      {
+        time: Date.parse('2026-06-25T13:15:00.000Z') / 1000,
+        open: 5499,
+        max: 5500,
+        min: 5498,
+        close: 5499.5,
+        volume: 200,
+      },
+      {
+        time: Date.parse('2026-06-25T13:30:00.000Z') / 1000,
+        open: 5500.25,
+        max: 5508.5,
+        min: 5498.75,
+        close: 5506,
+        volume: 3200,
+      },
+      {
+        time: Date.parse('2026-06-25T13:45:00.000Z') / 1000,
+        open: 5506,
+        max: 5510,
+        min: 5504.5,
+        close: 5508.25,
+        volume: 2980,
+      },
+      {
+        time: Date.parse('2026-06-26T13:30:00.000Z') / 1000,
+        open: 5514.25,
+        max: 5520,
+        min: 5513.75,
+        close: 5518.5,
+        volume: 3180,
+      },
+      {
+        time: Date.parse('2026-06-26T13:45:00.000Z') / 1000,
+        open: 5518.5,
+        max: 5521,
+        min: 5516.5,
+        close: 5519.25,
+        volume: 3020,
+      },
+    ]);
+
+    const result = await TradingView.collector.collectEsRth15mDataset({
+      createClient: () => client,
+      outputPath,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      minBars: 2,
+      timeoutMs: 1000,
+      includeIndicatorFeatures: false,
+    });
+
+    expect(result.validation).toEqual({ valid: true, errors: [] });
+    expect(result.dataset.manifest).toMatchObject({
+      schemaVersion: 1,
+      datasetId: 'es-rth-15m-2026-06-28T12-00-00-000Z',
+      source: 'tradingview',
+      symbol: {
+        ticker: 'CME_MINI:ES1!',
+        root: 'ES',
+        assetClass: 'equity_index_futures',
+      },
+      session: {
+        name: 'RTH',
+        timezone: 'America/New_York',
+        start: '09:30',
+        end: '16:00',
+        flatBeforeCloseMinutes: 5,
+        sessions: [
+          {
+            id: '2026-06-25',
+            firstBarTime: '2026-06-25T13:30:00.000Z',
+            lastBarTime: '2026-06-25T13:45:00.000Z',
+            flatBeforeCloseTime: '2026-06-25T19:55:00.000Z',
+            barCount: 2,
+          },
+          {
+            id: '2026-06-26',
+            firstBarTime: '2026-06-26T13:30:00.000Z',
+            lastBarTime: '2026-06-26T13:45:00.000Z',
+            flatBeforeCloseTime: '2026-06-26T19:55:00.000Z',
+            barCount: 2,
+          },
+        ],
+      },
+      bar: {
+        interval: '15m',
+        priceScale: 100,
+        volumeUnit: 'contracts',
+      },
+      contract: {
+        type: 'continuous_futures',
+        continuous: true,
+      },
+    });
+    expect(result.dataset.bars.map((bar) => bar.time)).toEqual([
+      '2026-06-25T13:30:00.000Z',
+      '2026-06-25T13:45:00.000Z',
+      '2026-06-26T13:30:00.000Z',
+      '2026-06-26T13:45:00.000Z',
+    ]);
+
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(result.dataset);
+    expect(client.ended).toBe(true);
+    expect(client.charts[0].lastMarket).toEqual({
+      symbol: 'CME_MINI:ES1!',
+      options: {
+        timeframe: '15',
+        range: 26,
+        to: undefined,
+        session: 'regular',
+        backadjustment: true,
+      },
+    });
+  });
 });

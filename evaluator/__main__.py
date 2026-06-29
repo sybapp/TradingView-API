@@ -12,6 +12,7 @@ from .nautilus_evaluator import (
     WalkForwardConfig,
     run_nautilus_validation_backtest,
     run_smoke_backtest,
+    run_walk_forward_candidate_selection_backtest,
     run_walk_forward_backtest,
 )
 
@@ -20,6 +21,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a TradingView versioned dataset.")
     parser.add_argument("dataset_path", help="Path to a Versioned Dataset directory")
     parser.add_argument("--strategy-spec", help="Path to a Strategy Spec JSON file")
+    parser.add_argument(
+        "--candidate-strategy-spec",
+        action="append",
+        default=[],
+        help="Path to a candidate Strategy Spec JSON file for training-window walk-forward selection",
+    )
     parser.add_argument("--run-registry", default="runs", help="Directory for strategy run records")
     parser.add_argument("--fixed-fee", type=float, default=2.50, help="Fixed fee per order")
     parser.add_argument("--slippage-ticks", type=int, default=1, help="Slippage ticks per order")
@@ -35,8 +42,12 @@ def main() -> None:
     parser.add_argument("--min-profitable-window-ratio", type=float, help="Minimum ratio of profitable scoring windows required")
     args = parser.parse_args()
 
-    if args.strategy_spec:
-        strategy_spec = json.loads(Path(args.strategy_spec).read_text(encoding="utf-8"))
+    if args.strategy_spec or args.candidate_strategy_spec:
+        strategy_spec = json.loads(Path(args.strategy_spec).read_text(encoding="utf-8")) if args.strategy_spec else None
+        candidate_specs = [
+            json.loads(Path(candidate_path).read_text(encoding="utf-8"))
+            for candidate_path in args.candidate_strategy_spec
+        ]
         cost_model = CostModel(
             fixed_fee=args.fixed_fee,
             slippage_ticks=args.slippage_ticks,
@@ -54,26 +65,47 @@ def main() -> None:
                 scoring_sessions=args.walk_forward_scoring_sessions,
                 step_sessions=args.walk_forward_step_sessions,
             )
-            result = run_walk_forward_backtest(
-                dataset_path=args.dataset_path,
-                strategy_spec=strategy_spec,
-                cost_model=cost_model,
-                registry_path=args.run_registry,
-                walk_forward=walk_forward,
-                fitness_constraints=FitnessConstraints(
-                    min_trades=args.min_trades,
-                    max_drawdown=args.max_drawdown,
-                    max_cost_to_gross_ratio=args.max_cost_to_gross_ratio,
-                    max_slippage_costs=args.max_slippage_costs,
-                    min_profitable_windows=args.min_profitable_windows,
-                    min_profitable_window_ratio=args.min_profitable_window_ratio,
-                ),
+            fitness_constraints = FitnessConstraints(
+                min_trades=args.min_trades,
+                max_drawdown=args.max_drawdown,
+                max_cost_to_gross_ratio=args.max_cost_to_gross_ratio,
+                max_slippage_costs=args.max_slippage_costs,
+                min_profitable_windows=args.min_profitable_windows,
+                min_profitable_window_ratio=args.min_profitable_window_ratio,
             )
+            if candidate_specs:
+                if strategy_spec is not None:
+                    candidate_specs.insert(0, strategy_spec)
+                result = run_walk_forward_candidate_selection_backtest(
+                    dataset_path=args.dataset_path,
+                    candidate_specs=candidate_specs,
+                    cost_model=cost_model,
+                    registry_path=args.run_registry,
+                    walk_forward=walk_forward,
+                    fitness_constraints=fitness_constraints,
+                )
+            else:
+                result = run_walk_forward_backtest(
+                    dataset_path=args.dataset_path,
+                    strategy_spec=strategy_spec,
+                    cost_model=cost_model,
+                    registry_path=args.run_registry,
+                    walk_forward=walk_forward,
+                    fitness_constraints=fitness_constraints,
+                )
             print(json.dumps({
                 "datasetId": result.dataset_id,
                 "strategyId": result.strategy_id,
                 "engine": result.engine,
                 "windows": len(result.windows),
+                "selectedCandidates": [
+                    {
+                        "windowId": selection.window_id,
+                        "candidateId": selection.selected_candidate_id,
+                        "strategyId": selection.selected_strategy_id,
+                    }
+                    for selection in result.selection_results
+                ],
                 "survived": result.fitness.survived,
                 "score": result.fitness.score,
                 "rejectionReasons": result.fitness.rejection_reasons,
@@ -82,6 +114,8 @@ def main() -> None:
             }))
             return
 
+        if strategy_spec is None:
+            raise SystemExit("--candidate-strategy-spec requires walk-forward training and scoring sessions")
         result = run_nautilus_validation_backtest(
             dataset_path=args.dataset_path,
             strategy_spec=strategy_spec,

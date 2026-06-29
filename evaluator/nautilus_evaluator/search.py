@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 import copy
@@ -12,12 +12,15 @@ import json
 import random
 import shutil
 
+import optuna
+
 from .strategy import (
     CostModel,
     EVALUATOR_VERSION,
     FitnessConstraints,
     WalkForwardBacktestResult,
     WalkForwardConfig,
+    run_walk_forward_candidate_selection_backtest,
     run_walk_forward_backtest,
 )
 from .strategy_spec import validate_strategy_spec
@@ -47,6 +50,9 @@ class EvaluatedSearchCandidate:
     strategy_spec: JsonObject
     result: WalkForwardBacktestResult
     optimizer_phase: str = "evaluation"
+    trial_number: Optional[int] = None
+    trial_parameters: JsonObject = field(default_factory=dict)
+    objective_value: Optional[float] = None
 
     @property
     def fitness(self):
@@ -60,6 +66,7 @@ class StrategySearchResult:
     evaluated_candidates: List[EvaluatedSearchCandidate]
     surviving_candidates: List[EvaluatedSearchCandidate]
     rejected_candidates: List[JsonObject]
+    trial_results: List[JsonObject]
     winning_candidate: Optional[EvaluatedSearchCandidate]
     registry_record_path: Path
 
@@ -76,7 +83,7 @@ def generate_bounded_template_specs(
         if search_config.method == "random":
             template_candidates = _sample_candidates(template_candidates, search_config)
         elif search_config.method == "optuna_style":
-            template_candidates = _optuna_style_candidates(template_candidates, search_config)
+            template_candidates = _trial_ordered_template_candidates(template_candidates, search_config)
         elif search_config.method != "deterministic":
             raise ValueError("search_config.method must be deterministic, random, or optuna_style")
 
@@ -103,7 +110,7 @@ def run_bounded_strategy_search(
 ) -> StrategySearchResult:
     """Evaluate bounded candidates through walk-forward validation and rank by Fitness Score."""
     if search_config.method == "optuna_style":
-        generated_candidates, evaluated, rejected = _run_optuna_style_search(
+        generated_candidates, evaluated, rejected, trial_results, selection_candidate = _run_trial_based_search(
             dataset_path=dataset_path,
             templates=templates,
             proposed_candidates=proposed_candidates or [],
@@ -113,6 +120,14 @@ def run_bounded_strategy_search(
             fitness_constraints=fitness_constraints,
             search_config=search_config,
         )
+        if not evaluated:
+            raise ValueError("bounded strategy search did not produce any schema-valid candidates")
+        selection_survivors, selection_rejections = _surviving_candidates(
+            [selection_candidate] if selection_candidate is not None else []
+        )
+        surviving_candidates = selection_survivors
+        rejected = _dedupe_rejected_candidates([*rejected, *selection_rejections])
+        winning_candidate = selection_survivors[0] if selection_survivors else None
     else:
         generated_candidates = generate_bounded_template_specs(templates, search_config)
         remaining_budget = search_config.max_candidates - len(generated_candidates)
@@ -129,13 +144,24 @@ def run_bounded_strategy_search(
             walk_forward=walk_forward,
             fitness_constraints=fitness_constraints,
         )
-
-    if not evaluated:
-        raise ValueError("bounded strategy search did not produce any schema-valid candidates")
-
-    surviving_candidates, evaluated_rejections = _surviving_candidates(evaluated)
-    rejected = _dedupe_rejected_candidates([*rejected, *evaluated_rejections])
-    winning_candidate = _rank_survivors(surviving_candidates)[0] if surviving_candidates else None
+        trial_results = []
+        if not evaluated:
+            raise ValueError("bounded strategy search did not produce any schema-valid candidates")
+        selection_candidate = _training_selection_candidate(
+            dataset_path=dataset_path,
+            evaluated=evaluated,
+            cost_model=cost_model,
+            registry_path=registry_path,
+            walk_forward=walk_forward,
+            fitness_constraints=fitness_constraints,
+        )
+        surviving_candidates, selection_rejections = _surviving_candidates(
+            [selection_candidate] if selection_candidate is not None else []
+        )
+        _, evaluated_rejections = _surviving_candidates(evaluated)
+        rejected = _dedupe_rejected_candidates([*rejected, *evaluated_rejections])
+        rejected = _dedupe_rejected_candidates([*rejected, *selection_rejections])
+        winning_candidate = _rank_survivors(surviving_candidates)[0] if surviving_candidates else None
     record_path = _write_search_registry_record(
         dataset_path=Path(dataset_path),
         registry_path=Path(registry_path),
@@ -147,6 +173,7 @@ def run_bounded_strategy_search(
         evaluated_candidates=evaluated,
         surviving_candidates=surviving_candidates,
         rejected_candidates=rejected,
+        trial_results=trial_results,
         winning_candidate=winning_candidate,
     )
     return StrategySearchResult(
@@ -155,6 +182,7 @@ def run_bounded_strategy_search(
         evaluated_candidates=evaluated,
         surviving_candidates=surviving_candidates,
         rejected_candidates=rejected,
+        trial_results=trial_results,
         winning_candidate=winning_candidate,
         registry_record_path=record_path,
     )
@@ -170,6 +198,7 @@ def _evaluate_candidates(
     fitness_constraints: FitnessConstraints,
     optimizer_phase: str = "evaluation",
     candidate_id_offset: int = 0,
+    trial_number_offset: Optional[int] = None,
 ) -> tuple[List[EvaluatedSearchCandidate], List[JsonObject]]:
     evaluated: List[EvaluatedSearchCandidate] = []
     rejected: List[JsonObject] = []
@@ -202,12 +231,19 @@ def _evaluate_candidates(
                 strategy_spec=spec.raw,
                 result=result,
                 optimizer_phase=optimizer_phase,
+                trial_number=(
+                    trial_number_offset + index
+                    if trial_number_offset is not None
+                    else None
+                ),
+                trial_parameters=_trial_parameters_from_spec(spec.raw),
+                objective_value=_objective_value(result),
             )
         )
     return evaluated, rejected
 
 
-def _run_optuna_style_search(
+def _run_trial_based_search(
     *,
     dataset_path: Union[str, Path],
     templates: Sequence[StrategyTemplate],
@@ -217,66 +253,101 @@ def _run_optuna_style_search(
     walk_forward: WalkForwardConfig,
     fitness_constraints: FitnessConstraints,
     search_config: BoundedSearchConfig,
-) -> tuple[List[JsonObject], List[EvaluatedSearchCandidate], List[JsonObject]]:
+) -> tuple[List[JsonObject], List[EvaluatedSearchCandidate], List[JsonObject], List[JsonObject], Optional[EvaluatedSearchCandidate]]:
     _validate_search_config(search_config)
-    template_candidates = _all_template_candidates(templates)
-    trial_budget = min(search_config.max_candidates, len(template_candidates))
-    exploration_count = max(1, trial_budget // 2) if trial_budget else 0
-    exploratory_candidates = template_candidates[:exploration_count]
-    evaluated, rejected = _evaluate_candidates(
+    search_space = _trial_search_space(templates, proposed_candidates)
+    trial_plan = _optuna_trial_plan(search_space, search_config)
+    generated_candidates: List[JsonObject] = []
+    evaluated: List[EvaluatedSearchCandidate] = []
+    rejected: List[JsonObject] = []
+    trial_results: List[JsonObject] = []
+    by_trial_number: Dict[int, EvaluatedSearchCandidate] = {}
+    rejected_by_trial_number: Dict[int, JsonObject] = {}
+    trial_plan_by_candidate_index = {
+        int(plan["candidateIndex"]): plan
+        for plan in trial_plan
+    }
+
+    def objective(trial) -> float:
+        candidate_index = trial.suggest_int("candidate_index", 0, max(len(search_space) - 1, 0))
+        plan = trial_plan_by_candidate_index[candidate_index]
+        generated_candidates.append(plan["strategySpec"])
+        candidate_id = f"candidate-{len(generated_candidates)}"
+        trial_number = int(trial.number + 1)
+        trial_parameters = dict(plan["parameters"])
+        trial_parameters["candidateIndex"] = candidate_index
+        try:
+            spec = validate_strategy_spec(plan["strategySpec"])
+        except ValueError as exc:
+            rejection = {
+                "candidateId": candidate_id,
+                "trialNumber": trial_number,
+                "source": plan["source"],
+                "strategySpec": dict(plan["strategySpec"]),
+                "trialParameters": trial_parameters,
+                "error": str(exc),
+            }
+            rejected.append(rejection)
+            rejected_by_trial_number[trial_number] = rejection
+            raise optuna.TrialPruned(str(exc)) from exc
+
+        for name, value in trial_parameters.items():
+            trial.set_user_attr(f"parameter:{name}", value)
+        trial.set_user_attr("candidateId", candidate_id)
+        trial.set_user_attr("source", plan["source"])
+        trial.set_user_attr("strategySpec", spec.raw)
+        result = run_walk_forward_backtest(
+            dataset_path=dataset_path,
+            strategy_spec=spec.raw,
+            cost_model=cost_model,
+            registry_path=registry_path,
+            walk_forward=walk_forward,
+            fitness_constraints=fitness_constraints,
+        )
+        candidate = EvaluatedSearchCandidate(
+            candidate_id=candidate_id,
+            strategy_id=spec.strategy_id,
+            strategy_spec=spec.raw,
+            result=result,
+            optimizer_phase="trial",
+            trial_number=trial_number,
+            trial_parameters=trial_parameters,
+            objective_value=_objective_value(result),
+        )
+        evaluated.append(candidate)
+        by_trial_number[trial_number] = candidate
+        return candidate.objective_value if candidate.objective_value is not None else float("-inf")
+
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=search_config.seed),
+    )
+    for plan in trial_plan:
+        study.enqueue_trial({"candidate_index": plan["candidateIndex"]})
+    study.optimize(objective, n_trials=len(trial_plan), catch=(ValueError,))
+
+    for trial in study.trials:
+        trial_number = trial.number + 1
+        candidate = by_trial_number.get(trial_number)
+        if candidate is not None:
+            source = str(trial.user_attrs.get("source", "template"))
+            trial_results.append(_evaluated_trial_to_json(candidate, source, trial))
+            continue
+        rejection = rejected_by_trial_number.get(trial_number)
+        if rejection is not None:
+            trial_results.append(_rejected_trial_to_json(rejection, trial))
+
+    selection_candidate = _training_selection_candidate(
         dataset_path=dataset_path,
-        candidates=exploratory_candidates,
+        evaluated=evaluated,
         cost_model=cost_model,
         registry_path=registry_path,
         walk_forward=walk_forward,
         fitness_constraints=fitness_constraints,
-        optimizer_phase="exploration",
     )
 
-    generated_candidates = list(exploratory_candidates)
-    remaining_budget = search_config.max_candidates - len(generated_candidates)
-    surviving_candidates, _ = _surviving_candidates(evaluated)
-
-    if remaining_budget > 0 and surviving_candidates:
-        best_spec = _rank_survivors(surviving_candidates)[0].strategy_spec
-        exploitation_candidates = _rank_unevaluated_candidates_for_exploitation(
-            candidates=template_candidates[exploration_count:],
-            best_spec=best_spec,
-            seed=search_config.seed,
-        )[:remaining_budget]
-        exploitation_evaluated, exploitation_rejected = _evaluate_candidates(
-            dataset_path=dataset_path,
-            candidates=exploitation_candidates,
-            cost_model=cost_model,
-            registry_path=registry_path,
-            walk_forward=walk_forward,
-            fitness_constraints=fitness_constraints,
-            optimizer_phase="exploitation",
-            candidate_id_offset=len(generated_candidates),
-        )
-        generated_candidates.extend(exploitation_candidates)
-        evaluated.extend(exploitation_evaluated)
-        rejected.extend(exploitation_rejected)
-
-    remaining_budget = search_config.max_candidates - len(generated_candidates)
-    if remaining_budget > 0 and proposed_candidates:
-        proposed = [dict(candidate) for candidate in proposed_candidates[:remaining_budget]]
-        proposed_evaluated, proposed_rejected = _evaluate_candidates(
-            dataset_path=dataset_path,
-            candidates=proposed,
-            cost_model=cost_model,
-            registry_path=registry_path,
-            walk_forward=walk_forward,
-            fitness_constraints=fitness_constraints,
-            optimizer_phase="proposed",
-            candidate_id_offset=len(generated_candidates),
-        )
-        generated_candidates.extend(proposed)
-        evaluated.extend(proposed_evaluated)
-        rejected.extend(proposed_rejected)
-
     rejected = _dedupe_rejected_candidates(rejected)
-    return generated_candidates, evaluated, rejected
+    return generated_candidates, evaluated, rejected, trial_results, selection_candidate
 
 
 def _all_template_candidates(templates: Sequence[StrategyTemplate]) -> List[JsonObject]:
@@ -286,35 +357,64 @@ def _all_template_candidates(templates: Sequence[StrategyTemplate]) -> List[Json
     return candidates
 
 
-def _rank_unevaluated_candidates_for_exploitation(
-    *,
-    candidates: Sequence[JsonObject],
-    best_spec: Mapping[str, Any],
-    seed: int,
-) -> List[JsonObject]:
-    rng = random.Random(seed)
+def _optuna_trial_plan(search_space: Sequence[JsonObject], search_config: BoundedSearchConfig) -> List[JsonObject]:
+    rng = random.Random(search_config.seed)
     decorated = [
         (
-            _choice_similarity(candidate, best_spec),
+            _trial_candidate_priority(candidate),
             rng.random(),
+            index,
             candidate,
         )
-        for candidate in candidates
+        for index, candidate in enumerate(search_space)
     ]
-    decorated.sort(key=lambda item: (item[0], item[1]), reverse=True)
-    return [candidate for _, _, candidate in decorated]
+    decorated.sort(key=lambda item: (item[0], item[1]))
+    return [
+        {
+            **copy.deepcopy(candidate),
+            "candidateIndex": index,
+            "trialNumber": trial_number,
+        }
+        for trial_number, (_, _, index, candidate) in enumerate(
+            decorated[: search_config.max_candidates],
+            start=1,
+        )
+    ]
 
 
-def _choice_similarity(candidate: Mapping[str, Any], best_spec: Mapping[str, Any]) -> int:
+def _trial_search_space(
+    templates: Sequence[StrategyTemplate],
+    proposed_candidates: Sequence[Mapping[str, Any]],
+) -> List[JsonObject]:
+    search_space: List[JsonObject] = []
+    for candidate in _all_template_candidates(templates):
+        search_space.append(
+            {
+                "source": "template",
+                "parameters": _trial_parameters_from_spec(candidate),
+                "strategySpec": candidate,
+            }
+        )
+    for index, candidate in enumerate(proposed_candidates, start=1):
+        candidate_copy = dict(candidate)
+        parameters = _trial_parameters_from_spec(candidate_copy)
+        parameters.setdefault("proposalIndex", index)
+        search_space.append(
+            {
+                "source": "proposed",
+                "parameters": parameters,
+                "strategySpec": candidate_copy,
+            }
+        )
+    return search_space
+
+
+def _trial_candidate_priority(candidate: Mapping[str, Any]) -> tuple[int, str]:
     parameters = candidate.get("parameters")
-    best_parameters = best_spec.get("parameters")
-    if not isinstance(parameters, dict) or not isinstance(best_parameters, dict):
-        return 0
-    return sum(
-        1
-        for key, value in parameters.items()
-        if key not in ("templateChoiceIndex", "templateId") and best_parameters.get(key) == value
-    )
+    if not isinstance(parameters, dict):
+        parameters = {}
+    source = 0 if candidate.get("source") == "template" else 1
+    return (source, json.dumps(parameters, sort_keys=True))
 
 
 def reproduce_search_winner(registry_record_path: Union[str, Path]) -> WalkForwardBacktestResult:
@@ -327,9 +427,34 @@ def reproduce_search_winner(registry_record_path: Union[str, Path]) -> WalkForwa
     walk_forward = record["walkForward"]["config"]
     constraints = record["fitnessConstraints"]
     dataset_path = record_path.parent / record["dataset"]["artifacts"]["snapshot"]
+    winning_spec = record["winningRun"]["strategySpec"]
+    if winning_spec.get("selectionStrategy") == "training-window-candidate-selection":
+        return run_walk_forward_candidate_selection_backtest(
+            dataset_path=dataset_path,
+            candidate_specs=winning_spec["candidateStrategySpecs"],
+            cost_model=CostModel(
+                fixed_fee=cost_model["fixedFee"],
+                slippage_ticks=cost_model["slippageTicks"],
+                tick_size=cost_model["tickSize"],
+            ),
+            registry_path=record_path.parent / "reproduced-runs",
+            walk_forward=WalkForwardConfig(
+                training_sessions=walk_forward["trainingSessions"],
+                scoring_sessions=walk_forward["scoringSessions"],
+                step_sessions=walk_forward["stepSessions"],
+            ),
+            fitness_constraints=FitnessConstraints(
+                min_trades=constraints["minTrades"],
+                max_drawdown=constraints["maxDrawdown"],
+                max_cost_to_gross_ratio=constraints["maxCostToGrossRatio"],
+                max_slippage_costs=constraints["maxSlippageCosts"],
+                min_profitable_windows=constraints["minProfitableWindows"],
+                min_profitable_window_ratio=constraints["minProfitableWindowRatio"],
+            ),
+        )
     return run_walk_forward_backtest(
         dataset_path=dataset_path,
-        strategy_spec=record["winningRun"]["strategySpec"],
+        strategy_spec=winning_spec,
         cost_model=CostModel(
             fixed_fee=cost_model["fixedFee"],
             slippage_ticks=cost_model["slippageTicks"],
@@ -388,15 +513,62 @@ def _sample_candidates(candidates: List[JsonObject], search_config: BoundedSearc
     return sampled[: search_config.max_candidates]
 
 
-def _optuna_style_candidates(candidates: List[JsonObject], search_config: BoundedSearchConfig) -> List[JsonObject]:
-    if len(candidates) <= search_config.max_candidates:
-        return candidates
-    rng = random.Random(search_config.seed)
-    exploratory_count = max(1, search_config.max_candidates // 2)
-    exploratory = candidates[:exploratory_count]
-    remaining = candidates[exploratory_count:]
-    rng.shuffle(remaining)
-    return (exploratory + remaining)[: search_config.max_candidates]
+def _trial_ordered_template_candidates(candidates: List[JsonObject], search_config: BoundedSearchConfig) -> List[JsonObject]:
+    search_space = [
+        {
+            "source": "template",
+            "parameters": _trial_parameters_from_spec(candidate),
+            "strategySpec": candidate,
+        }
+        for candidate in candidates
+    ]
+    return [
+        trial["strategySpec"]
+        for trial in _optuna_trial_plan(search_space, search_config)
+    ]
+
+
+def _training_selection_candidate(
+    *,
+    dataset_path: Union[str, Path],
+    evaluated: Sequence[EvaluatedSearchCandidate],
+    cost_model: CostModel,
+    registry_path: Union[str, Path],
+    walk_forward: WalkForwardConfig,
+    fitness_constraints: FitnessConstraints,
+) -> Optional[EvaluatedSearchCandidate]:
+    if not evaluated:
+        return None
+
+    result = run_walk_forward_candidate_selection_backtest(
+        dataset_path=dataset_path,
+        candidate_specs=[candidate.strategy_spec for candidate in evaluated],
+        cost_model=cost_model,
+        registry_path=registry_path,
+        walk_forward=walk_forward,
+        fitness_constraints=fitness_constraints,
+    )
+    return EvaluatedSearchCandidate(
+        candidate_id="training-window-selection",
+        strategy_id=result.strategy_id,
+        strategy_spec={
+            "selectionStrategy": "training-window-candidate-selection",
+            "candidateStrategySpecs": [candidate.strategy_spec for candidate in evaluated],
+        },
+        result=result,
+        optimizer_phase="training-window-selection",
+        trial_parameters={
+            "selectedCandidates": [
+                {
+                    "windowId": selection.window_id,
+                    "candidateId": selection.selected_candidate_id,
+                    "strategyId": selection.selected_strategy_id,
+                }
+                for selection in result.selection_results
+            ],
+        },
+        objective_value=result.fitness.score,
+    )
 
 
 def _set_path(value: JsonObject, path: str, replacement: Any) -> None:
@@ -561,6 +733,7 @@ def _write_search_registry_record(
     evaluated_candidates: List[EvaluatedSearchCandidate],
     surviving_candidates: List[EvaluatedSearchCandidate],
     rejected_candidates: List[JsonObject],
+    trial_results: List[JsonObject],
     winning_candidate: Optional[EvaluatedSearchCandidate],
 ) -> Path:
     run_id = _search_run_id(
@@ -589,9 +762,11 @@ def _write_search_registry_record(
         "evaluatorVersion": EVALUATOR_VERSION,
         "dataset": dataset_record,
         "optimizerConfig": _search_config_to_json(search_config),
+        "sampler": _sampler_config_to_json(search_config),
         "costModel": _cost_model_to_json(cost_model),
         "walkForward": {"config": _walk_forward_config_to_json(walk_forward)},
         "fitnessConstraints": _fitness_constraints_to_json(fitness_constraints),
+        "trials": trial_results,
         "generatedCandidates": generated_candidates,
         "evaluatedSpecs": [_evaluated_candidate_to_json(candidate) for candidate in evaluated_candidates],
         "survivingCandidates": [_evaluated_candidate_to_json(candidate) for candidate in ranked_survivors],
@@ -602,10 +777,12 @@ def _write_search_registry_record(
         "reproducibilityInputs": {
             "datasetSnapshot": dataset_record["artifacts"]["snapshot"],
             "optimizerConfig": _search_config_to_json(search_config),
+            "sampler": _sampler_config_to_json(search_config),
             "costModel": _cost_model_to_json(cost_model),
             "walkForward": _walk_forward_config_to_json(walk_forward),
             "fitnessConstraints": _fitness_constraints_to_json(fitness_constraints),
             "generatedCandidatesHash": _json_hash(generated_candidates),
+            "trialsHash": _json_hash(trial_results),
         },
     }
     record_path = search_path / "search.json"
@@ -645,7 +822,7 @@ def _snapshot_dataset(search_path: Path, dataset_path: Path) -> JsonObject:
 
 
 def _evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate) -> JsonObject:
-    return {
+    payload = {
         "candidateId": candidate.candidate_id,
         "strategyId": candidate.strategy_id,
         "strategySpec": candidate.strategy_spec,
@@ -653,10 +830,15 @@ def _evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate) -> JsonObj
         "registryRecord": str(candidate.result.registry_record_path),
         "fitness": _fitness_to_json(candidate.fitness),
     }
+    if candidate.trial_number is not None:
+        payload["trialNumber"] = candidate.trial_number
+        payload["trialParameters"] = candidate.trial_parameters
+        payload["objectiveValue"] = candidate.objective_value
+    return payload
 
 
 def _rejected_evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate, reasons: Sequence[str]) -> JsonObject:
-    return {
+    payload = {
         "candidateId": candidate.candidate_id,
         "strategyId": candidate.strategy_id,
         "source": "evaluated",
@@ -666,6 +848,11 @@ def _rejected_evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate, r
         "rejectionReasons": list(reasons),
         "fitness": _fitness_to_json(candidate.fitness),
     }
+    if candidate.trial_number is not None:
+        payload["trialNumber"] = candidate.trial_number
+        payload["trialParameters"] = candidate.trial_parameters
+        payload["objectiveValue"] = candidate.objective_value
+    return payload
 
 
 def _winning_candidate_to_json(
@@ -679,6 +866,9 @@ def _winning_candidate_to_json(
         "strategyId": candidate.strategy_id,
         "strategySpec": candidate.strategy_spec,
         "fitness": _fitness_to_json(candidate.fitness),
+        "trialNumber": candidate.trial_number,
+        "trialParameters": candidate.trial_parameters,
+        "objectiveValue": candidate.objective_value,
         "sourceRunRecord": str(candidate.result.registry_record_path),
         "provenance": {
             "recordType": "Nautilus Walk-Forward Validation",
@@ -711,6 +901,9 @@ def _best_rejected_candidate_to_json(candidate: Optional[EvaluatedSearchCandidat
         "strategyId": candidate.strategy_id,
         "strategySpec": candidate.strategy_spec,
         "fitness": _fitness_to_json(candidate.fitness),
+        "trialNumber": candidate.trial_number,
+        "trialParameters": candidate.trial_parameters,
+        "objectiveValue": candidate.objective_value,
         "diagnosticOnly": True,
     }
 
@@ -772,6 +965,20 @@ def _search_config_to_json(search_config: BoundedSearchConfig) -> JsonObject:
     }
 
 
+def _sampler_config_to_json(search_config: BoundedSearchConfig) -> JsonObject:
+    if search_config.method != "optuna_style":
+        return {"name": "none", "seed": search_config.seed}
+    return {
+        "name": "optuna-tpe-sampler",
+        "package": "optuna",
+        "samplerClass": "TPESampler",
+        "objective": "maximize_fitness_score",
+        "seed": search_config.seed,
+        "maxTrials": search_config.max_candidates,
+        "searchSpace": "bounded_strategy_template_choices_and_validated_proposals",
+    }
+
+
 def _cost_model_to_json(cost_model: CostModel) -> JsonObject:
     return {
         "fixedFee": cost_model.fixed_fee,
@@ -809,6 +1016,53 @@ def _fitness_to_json(fitness) -> JsonObject:
         "rejectionReasons": fitness.rejection_reasons,
         "survivalChecks": fitness.survival_checks,
         "rankingInputs": fitness.ranking_inputs,
+    }
+
+
+def _trial_parameters_from_spec(strategy_spec: Mapping[str, Any]) -> JsonObject:
+    parameters = strategy_spec.get("parameters")
+    if not isinstance(parameters, dict):
+        return {}
+    return {
+        key: value
+        for key, value in parameters.items()
+        if key not in ("direction_feature",)
+    }
+
+
+def _objective_value(result: WalkForwardBacktestResult) -> Optional[float]:
+    return result.fitness.score if result.fitness.survived else None
+
+
+def _evaluated_trial_to_json(candidate: EvaluatedSearchCandidate, source: str, trial: Any = None) -> JsonObject:
+    return {
+        "trialNumber": candidate.trial_number,
+        "candidateId": candidate.candidate_id,
+        "strategyId": candidate.strategy_id,
+        "source": source,
+        "state": "complete",
+        "samplerState": str(trial.state.name) if trial is not None else "COMPLETE",
+        "optunaParams": dict(trial.params) if trial is not None else {},
+        "parameters": candidate.trial_parameters,
+        "objectiveValue": candidate.objective_value,
+        "strategySpec": candidate.strategy_spec,
+        "registryRecord": str(candidate.result.registry_record_path),
+        "fitness": _fitness_to_json(candidate.fitness),
+    }
+
+
+def _rejected_trial_to_json(rejection: Mapping[str, Any], trial: Any = None) -> JsonObject:
+    return {
+        "trialNumber": rejection.get("trialNumber"),
+        "candidateId": rejection.get("candidateId"),
+        "source": rejection.get("source"),
+        "state": "rejected",
+        "samplerState": str(trial.state.name) if trial is not None else "PRUNED",
+        "optunaParams": dict(trial.params) if trial is not None else {},
+        "parameters": rejection.get("trialParameters", {}),
+        "objectiveValue": None,
+        "strategySpec": rejection.get("strategySpec"),
+        "error": rejection.get("error"),
     }
 
 

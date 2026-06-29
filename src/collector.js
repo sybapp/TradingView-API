@@ -4,20 +4,33 @@ const Client = require('./client');
 const datasetContract = require('./datasetContract');
 const miscRequests = require('./miscRequests');
 
-const ES_RTH_5M_DEFAULTS = {
+const ES_RTH_BASE_DEFAULTS = {
   symbol: 'CME_MINI:ES1!',
   root: 'ES',
   assetClass: 'equity_index_futures',
-  interval: '5m',
-  tradingViewTimeframe: '5',
   sessionName: 'RTH',
   timezone: 'America/New_York',
   sessionStart: '09:30',
   sessionEnd: '16:00',
   flatBeforeCloseMinutes: 5,
   volumeUnit: 'contracts',
-  range: 78,
   minBars: 1,
+};
+
+const ES_RTH_5M_DEFAULTS = {
+  ...ES_RTH_BASE_DEFAULTS,
+  interval: '5m',
+  datasetPrefix: 'es-rth-5m',
+  tradingViewTimeframe: '5',
+  range: 78,
+};
+
+const ES_RTH_15M_DEFAULTS = {
+  ...ES_RTH_BASE_DEFAULTS,
+  interval: '15m',
+  datasetPrefix: 'es-rth-15m',
+  tradingViewTimeframe: '15',
+  range: 26,
 };
 
 const CURATED_INDICATOR_ALLOWLIST = [
@@ -129,7 +142,7 @@ function zonedDateTimeToUtc(dateValue, clockValue, timezone) {
 function sessionFlatBeforeCloseTime(sessionId, session) {
   const end = zonedDateTimeToUtc(sessionId, session.end, session.timezone);
   const flatBeforeCloseMinutes = session.flatBeforeCloseMinutes
-    ?? ES_RTH_5M_DEFAULTS.flatBeforeCloseMinutes;
+    ?? ES_RTH_BASE_DEFAULTS.flatBeforeCloseMinutes;
 
   return new Date(end.getTime() - (flatBeforeCloseMinutes * 60 * 1000)).toISOString();
 }
@@ -527,9 +540,9 @@ async function collectIndicatorStudies({
 
 function periodsToRthBars(periods, options = {}) {
   const session = {
-    timezone: options.timezone || ES_RTH_5M_DEFAULTS.timezone,
-    start: options.sessionStart || ES_RTH_5M_DEFAULTS.sessionStart,
-    end: options.sessionEnd || ES_RTH_5M_DEFAULTS.sessionEnd,
+    timezone: options.timezone || ES_RTH_BASE_DEFAULTS.timezone,
+    start: options.sessionStart || ES_RTH_BASE_DEFAULTS.sessionStart,
+    end: options.sessionEnd || ES_RTH_BASE_DEFAULTS.sessionEnd,
   };
 
   const bars = periods
@@ -537,11 +550,12 @@ function periodsToRthBars(periods, options = {}) {
     .filter((bar) => isInsideSession(bar.time, session))
     .sort((left, right) => Date.parse(left.time) - Date.parse(right.time));
 
-  if (bars.length < (options.minBars || ES_RTH_5M_DEFAULTS.minBars)) return [];
+  if (bars.length < (options.minBars || ES_RTH_BASE_DEFAULTS.minBars)) return [];
   return bars;
 }
 
-function buildEsRth5mDataset({
+function buildEsRthDataset({
+  defaults,
   bars,
   infos = {},
   now = new Date(),
@@ -551,32 +565,32 @@ function buildEsRth5mDataset({
 } = {}) {
   const collectedAt = now instanceof Date ? now : new Date(now);
   const session = {
-    name: ES_RTH_5M_DEFAULTS.sessionName,
-    timezone: ES_RTH_5M_DEFAULTS.timezone,
-    start: ES_RTH_5M_DEFAULTS.sessionStart,
-    end: ES_RTH_5M_DEFAULTS.sessionEnd,
-    flatBeforeCloseMinutes: ES_RTH_5M_DEFAULTS.flatBeforeCloseMinutes,
+    name: defaults.sessionName,
+    timezone: defaults.timezone,
+    start: defaults.sessionStart,
+    end: defaults.sessionEnd,
+    flatBeforeCloseMinutes: defaults.flatBeforeCloseMinutes,
   };
 
   return {
     manifest: {
       schemaVersion: 1,
-      datasetId: datasetId || stableDatasetId('es-rth-5m', collectedAt),
+      datasetId: datasetId || stableDatasetId(defaults.datasetPrefix, collectedAt),
       collectedAt: collectedAt.toISOString(),
       source: 'tradingview',
       symbol: {
-        ticker: ES_RTH_5M_DEFAULTS.symbol,
-        root: ES_RTH_5M_DEFAULTS.root,
-        assetClass: ES_RTH_5M_DEFAULTS.assetClass,
+        ticker: defaults.symbol,
+        root: defaults.root,
+        assetClass: defaults.assetClass,
       },
       session: {
         ...session,
         sessions: deriveRthSessions(bars, session),
       },
       bar: {
-        interval: ES_RTH_5M_DEFAULTS.interval,
+        interval: defaults.interval,
         priceScale: infos.pricescale || 100,
-        volumeUnit: ES_RTH_5M_DEFAULTS.volumeUnit,
+        volumeUnit: defaults.volumeUnit,
       },
       contract: {
         type: 'continuous_futures',
@@ -595,6 +609,20 @@ function buildEsRth5mDataset({
       allowlist: indicatorAllowlist,
     }),
   };
+}
+
+function buildEsRth5mDataset(options = {}) {
+  return buildEsRthDataset({
+    ...options,
+    defaults: ES_RTH_5M_DEFAULTS,
+  });
+}
+
+function buildEsRth15mDataset(options = {}) {
+  return buildEsRthDataset({
+    ...options,
+    defaults: ES_RTH_15M_DEFAULTS,
+  });
 }
 
 function writeJsonSync(filePath, value) {
@@ -631,12 +659,14 @@ function waitForChartBars(chart, { minBars, timeoutMs }) {
   });
 }
 
-async function collectEsRth5mDataset({
+async function collectEsRthDataset({
+  defaults,
+  buildDataset,
   createClient,
   outputPath,
   now = new Date(),
-  range = ES_RTH_5M_DEFAULTS.range,
-  minBars = ES_RTH_5M_DEFAULTS.minBars,
+  range = defaults.range,
+  minBars = defaults.minBars,
   timeoutMs = 30000,
   to,
   indicatorAllowlist = CURATED_INDICATOR_ALLOWLIST,
@@ -654,8 +684,8 @@ async function collectEsRth5mDataset({
 
   try {
     const barsPromise = waitForChartBars(chart, { minBars, timeoutMs });
-    chart.setMarket(ES_RTH_5M_DEFAULTS.symbol, {
-      timeframe: ES_RTH_5M_DEFAULTS.tradingViewTimeframe,
+    chart.setMarket(defaults.symbol, {
+      timeframe: defaults.tradingViewTimeframe,
       range,
       to,
       session: 'regular',
@@ -671,7 +701,7 @@ async function collectEsRth5mDataset({
         resolveIndicator,
         timeoutMs,
       });
-    const dataset = buildEsRth5mDataset({
+    const dataset = buildDataset({
       bars,
       infos: chart.infos,
       now,
@@ -697,9 +727,27 @@ async function collectEsRth5mDataset({
   }
 }
 
+async function collectEsRth5mDataset(options = {}) {
+  return collectEsRthDataset({
+    ...options,
+    defaults: ES_RTH_5M_DEFAULTS,
+    buildDataset: buildEsRth5mDataset,
+  });
+}
+
+async function collectEsRth15mDataset(options = {}) {
+  return collectEsRthDataset({
+    ...options,
+    defaults: ES_RTH_15M_DEFAULTS,
+    buildDataset: buildEsRth15mDataset,
+  });
+}
+
 module.exports = {
   collectEsRth5mDataset,
+  collectEsRth15mDataset,
   buildEsRth5mDataset,
+  buildEsRth15mDataset,
   collectIndicatorStudies,
   indicatorStudiesToFeatures,
   periodsToRthBars,

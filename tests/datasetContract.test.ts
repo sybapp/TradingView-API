@@ -139,4 +139,73 @@ describe('Versioned Dataset Contract', () => {
       ]),
     );
   });
+
+  it('accepts 15 minute ES RTH bars and rejects malformed 15 minute gaps', () => {
+    const dataset = TradingView.collector.buildEsRth15mDataset({
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      bars: [
+        {
+          time: '2026-06-25T13:30:00.000Z',
+          open: 5500.25,
+          high: 5508.5,
+          low: 5498.75,
+          close: 5506,
+          volume: 3200,
+        },
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5506,
+          high: 5510,
+          low: 5504.5,
+          close: 5508.25,
+          volume: 2980,
+        },
+        {
+          time: '2026-06-26T13:30:00.000Z',
+          open: 5514.25,
+          high: 5520,
+          low: 5513.75,
+          close: 5518.5,
+          volume: 3180,
+        },
+        {
+          time: '2026-06-26T13:45:00.000Z',
+          open: 5518.5,
+          high: 5521,
+          low: 5516.5,
+          close: 5519.25,
+          volume: 3020,
+        },
+      ],
+      indicatorAllowlist: [],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(dataset.manifest.bar.interval).toBe('15m');
+    expect(dataset.manifest.symbol).toEqual({
+      ticker: 'CME_MINI:ES1!',
+      root: 'ES',
+      assetClass: 'equity_index_futures',
+    });
+    expect(dataset.manifest.contract).toMatchObject({
+      type: 'continuous_futures',
+      continuous: true,
+    });
+
+    dataset.bars[1].time = '2026-06-25T13:50:00.000Z';
+    const malformed = TradingView.datasetContract.validateDataset(dataset);
+
+    expect(malformed.valid).toBe(false);
+    expect(malformed.errors).toEqual(
+      expect.arrayContaining([
+        {
+          path: 'bars[1].time',
+          message: 'must be 15 minutes after bars[0].time',
+        },
+      ]),
+    );
+  });
 });
