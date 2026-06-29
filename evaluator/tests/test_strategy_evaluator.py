@@ -82,6 +82,33 @@ class StrategyEvaluatorTests(unittest.TestCase):
         self.assertEqual(validated.entry_rules[0].name, "bullish_bos")
         self.assertTrue(validated.entry_rules[0].value)
 
+    def test_strategy_spec_validation_accepts_reverse_signal_exit_rules(self):
+        spec = {
+            **HAND_WRITTEN_SPEC,
+            "exits": {
+                "maxBarsInTrade": 100,
+                "reverseSignalRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bearish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+            },
+        }
+
+        validated = validate_strategy_spec(spec)
+
+        self.assertEqual(validated.exits.max_bars_in_trade, 100)
+        self.assertEqual(len(validated.exits.reverse_signal_rules), 1)
+        self.assertEqual(validated.exits.reverse_signal_rules[0].name, "bearish_bos")
+        self.assertEqual(validated.exits.reverse_signal_rules[0].feature_type, "signal")
+
     def test_strategy_replay_honors_signal_feature_type_without_breaking_legacy_specs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             dataset_path = _write_walk_forward_dataset(
@@ -134,6 +161,280 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "intraday-flat-before-close"])
             self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:30:00+00:00")
             self.assertEqual(result.orders[0].execution_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
+
+    def test_strategy_replay_exits_long_on_reverse_signal_next_bar(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "signal-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                    _typed_feature(
+                        "signal-exit",
+                        "2026-06-25T13:35:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bearish_choch",
+                        value=True,
+                    ),
+                ],
+                prices=[100, 100, 104, 104],
+                session_dates=["2026-06-25"],
+                session_end="13:50",
+            )
+            reverse_exit_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-reverse-exit-long",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 100,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_choch",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=reverse_exit_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "exit:reverse-signal"])
+            self.assertEqual(result.orders[-1].signal_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
+            self.assertEqual(result.orders[-1].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
+
+    def test_strategy_replay_prioritizes_stop_loss_over_reverse_signal(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "signal-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    ),
+                    _typed_feature(
+                        "signal-exit",
+                        "2026-06-25T13:35:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bearish_mss",
+                        value=True,
+                    ),
+                ],
+                prices=[100, 100, 97, 97],
+                session_dates=["2026-06-25"],
+                session_end="13:50",
+            )
+            reverse_exit_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-stop-priority-long",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 100,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_mss",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 4,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=reverse_exit_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "stop-loss"])
+
+    def test_strategy_replay_uses_max_bars_when_no_reverse_signal_arrives(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "signal-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    )
+                ],
+                prices=[100, 100, 100],
+                session_dates=["2026-06-25"],
+                session_end="13:50",
+            )
+            reverse_exit_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-max-bars-fallback-long",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 1,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_bos",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=reverse_exit_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "max-bars-in-trade"])
+
+    def test_strategy_replay_uses_intraday_flat_when_reverse_signal_never_arrives(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = _write_walk_forward_dataset(
+                Path(temp_dir) / "dataset",
+                features=[
+                    _typed_feature(
+                        "signal-entry",
+                        "2026-06-25T13:30:00.000Z",
+                        indicator_id="LUX;ICT_SMC",
+                        feature_type="signal",
+                        name="bullish_bos",
+                        value=True,
+                    )
+                ],
+                prices=[100, 100, 100, 100],
+                session_dates=["2026-06-25"],
+            )
+            reverse_exit_spec = {
+                **HAND_WRITTEN_SPEC,
+                "strategyId": "fixture-intraday-flat-fallback-long",
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 100,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_bos",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+                "riskControls": {
+                    **HAND_WRITTEN_SPEC["riskControls"],
+                    "flatBeforeCloseMinutes": 5,
+                    "stopLossTicks": 100,
+                    "takeProfitTicks": 100,
+                },
+            }
+
+            result = run_strategy_backtest(
+                dataset_path=dataset_path,
+                strategy_spec=reverse_exit_spec,
+                cost_model=CostModel(fixed_fee=0, slippage_ticks=0, tick_size=0.25),
+                registry_path=Path(temp_dir) / "run-registry",
+            )
+
+            self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "intraday-flat-before-close"])
 
     def test_walk_forward_scoring_does_not_use_training_window_features(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -247,7 +548,7 @@ class StrategyEvaluatorTests(unittest.TestCase):
             self.assertGreater(registry_record["fitness"]["rankingInputs"]["outOfSampleSharpe"], 0)
 
 
-def _write_walk_forward_dataset(path: Path, features, prices=None, session_dates=None):
+def _write_walk_forward_dataset(path: Path, features, prices=None, session_dates=None, session_end="13:45"):
     path.mkdir()
     prices = prices or [100, 100, 100, 100, 100, 110]
     session_dates = session_dates or ["2026-06-25", "2026-06-26"]
@@ -264,7 +565,7 @@ def _write_walk_forward_dataset(path: Path, features, prices=None, session_dates
         "session": {
             "timezone": "UTC",
             "start": "13:30",
-            "end": "13:45",
+            "end": session_end,
             "sessions": [
                 {
                     "id": session_date,

@@ -395,13 +395,102 @@ def _run_compiled_strategy(
     pending_order: Optional[PendingOrder] = None
     position_quantity = 0
     flat_at_ns = _flat_at_nanoseconds(dataset, spec.risk_controls.flat_before_close_minutes)
+    entry_bar_price: Optional[int] = None
+    entry_bar_index: Optional[int] = None
+    entry_bar_time_ns: Optional[int] = None
 
     for index, bar in enumerate(bars):
         if pending_order is not None:
+            if (
+                pending_order.side == "sell"
+                and pending_order.reason == "exit:reverse-signal"
+                and entry_bar_price is not None
+            ):
+                stop_price = entry_bar_price - round(
+                    spec.risk_controls.stop_loss_ticks * cost_model.tick_size * dataset.price_scale
+                )
+                if bar.low <= stop_price:
+                    pending_order = PendingOrder(
+                        side="sell",
+                        quantity=pending_order.quantity,
+                        reason="stop-loss",
+                        signal_bar=bar,
+                    )
             order = _execute_order(pending_order, bar, cost_model, dataset.price_scale)
             orders.append(order)
             position_quantity += order.quantity if order.side == "buy" else -order.quantity
+            if order.side == "buy":
+                entry_bar_price = bar.open
+                entry_bar_index = index
+                entry_bar_time_ns = bar.ts_event
+            else:
+                entry_bar_price = None
+                entry_bar_index = None
+                entry_bar_time_ns = None
             pending_order = None
+
+        if (
+            position_quantity > 0
+            and entry_bar_price is not None
+            and entry_bar_index is not None
+            and entry_bar_time_ns is not None
+        ):
+            stop_price = entry_bar_price - round(spec.risk_controls.stop_loss_ticks * cost_model.tick_size * dataset.price_scale)
+            if bar.low <= stop_price:
+                orders.append(
+                    _execute_order(
+                        PendingOrder(
+                            side="sell",
+                            quantity=position_quantity,
+                            reason="stop-loss",
+                            signal_bar=bar,
+                        ),
+                        bar,
+                        cost_model,
+                        dataset.price_scale,
+                    )
+                )
+                position_quantity = 0
+                entry_bar_price = None
+                entry_bar_index = None
+                entry_bar_time_ns = None
+                continue
+
+            matched_exit_rule = _matching_feature_rule(
+                spec.exits.reverse_signal_rules,
+                dataset.features,
+                bar.ts_event,
+                earliest_feature_ns=entry_bar_time_ns,
+            )
+            if matched_exit_rule is not None and index + 1 < len(bars) and bars[index + 1].ts_event < flat_at_ns:
+                pending_order = PendingOrder(
+                    side="sell",
+                    quantity=position_quantity,
+                    reason="exit:reverse-signal",
+                    signal_bar=bar,
+                )
+                continue
+
+            max_bars = spec.exits.max_bars_in_trade
+            if max_bars is not None and index - entry_bar_index >= max_bars:
+                orders.append(
+                    _execute_order(
+                        PendingOrder(
+                            side="sell",
+                            quantity=position_quantity,
+                            reason="max-bars-in-trade",
+                            signal_bar=bar,
+                        ),
+                        bar,
+                        cost_model,
+                        dataset.price_scale,
+                    )
+                )
+                position_quantity = 0
+                entry_bar_price = None
+                entry_bar_index = None
+                entry_bar_time_ns = None
+                continue
 
         if bar.ts_event >= flat_at_ns and position_quantity > 0:
             orders.append(
@@ -418,11 +507,15 @@ def _run_compiled_strategy(
                 )
             )
             position_quantity = 0
+            entry_bar_price = None
+            entry_bar_index = None
+            entry_bar_time_ns = None
+            continue
 
         is_last_bar = index == len(bars) - 1
         can_enter = not is_last_bar and position_quantity == 0 and pending_order is None
         if can_enter and bars[index + 1].ts_event < flat_at_ns:
-            matched_rule = _matching_entry_rule(spec.entry_rules, dataset.features, bar.ts_event)
+            matched_rule = _matching_feature_rule(spec.entry_rules, dataset.features, bar.ts_event)
             if matched_rule is not None:
                 pending_order = PendingOrder(
                     side="buy",
@@ -454,15 +547,21 @@ def _run_compiled_strategy(
     return orders
 
 
-def _matching_entry_rule(
+def _matching_feature_rule(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
     bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
 ) -> Optional[FeatureEqualsEntryRule]:
     available_features = [
         feature
         for feature in features
         if timestamp_to_nanoseconds(feature.availability_time) <= bar_time_ns
+        and (
+            earliest_feature_ns is None
+            or timestamp_to_nanoseconds(feature.availability_time) >= earliest_feature_ns
+        )
     ]
     for rule in rules:
         if any(

@@ -213,10 +213,36 @@ class _StrategySpecNautilusAdapter:
 
             def on_bar(self, bar):
                 if self.pending_signal is not None:
+                    if (
+                        self.pending_signal.side == "sell"
+                        and self.pending_signal.reason == "exit:reverse-signal"
+                        and self.open_position is not None
+                    ):
+                        dataset_bar = self.bars_by_ns[bar.ts_event]
+                        stop_price = self.open_position.entry_price - (
+                            self.spec.risk_controls.stop_loss_ticks * self.tick_size
+                        )
+                        if dataset_bar.low <= stop_price:
+                            self.pending_signal = _PendingSignal(
+                                side="sell",
+                                quantity=self.open_position.quantity,
+                                reason="stop-loss",
+                                signal_bar_ns=bar.ts_event,
+                            )
                     self._submit_pending_signal(bar)
 
                 exit_reason = self._exit_reason(bar)
                 if self.open_position is not None and exit_reason is not None:
+                    if exit_reason == "exit:reverse-signal":
+                        if not self._next_bar_can_execute_before_flat(bar.ts_event):
+                            return
+                        self.pending_signal = _PendingSignal(
+                            side="sell",
+                            quantity=self.open_position.quantity,
+                            reason=exit_reason,
+                            signal_bar_ns=bar.ts_event,
+                        )
+                        return
                     self._submit_order(
                         side="sell",
                         quantity=self.open_position.quantity,
@@ -324,11 +350,21 @@ class _StrategySpecNautilusAdapter:
                 if dataset_bar.low <= stop_price:
                     return "stop-loss"
 
-                take_profit_price = position.entry_price + (
-                    self.spec.risk_controls.take_profit_ticks * self.tick_size
+                matched_exit_rule = _matching_entry_rule(
+                    self.spec.exits.reverse_signal_rules,
+                    self.dataset.features,
+                    bar.ts_event,
+                    earliest_feature_ns=position.entry_bar_ns,
                 )
-                if dataset_bar.high >= take_profit_price:
-                    return "take-profit"
+                if matched_exit_rule is not None:
+                    return "exit:reverse-signal"
+
+                if not self.spec.exits.reverse_signal_rules:
+                    take_profit_price = position.entry_price + (
+                        self.spec.risk_controls.take_profit_ticks * self.tick_size
+                    )
+                    if dataset_bar.high >= take_profit_price:
+                        return "take-profit"
 
                 max_bars = self.spec.exits.max_bars_in_trade
                 if max_bars is not None:
