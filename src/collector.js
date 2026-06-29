@@ -303,6 +303,7 @@ function normalizeGraphicFeature({
   availabilityTime,
   value,
   index,
+  graphic,
 }) {
   return {
     id: featureId({
@@ -320,7 +321,12 @@ function normalizeGraphicFeature({
     eventTime,
     availabilityTime,
     repaintingRisk: indicator.repaintingRisk,
-    value,
+    value: {
+      ...value,
+      graphicKind: graphic?.kind,
+      graphicId: graphic?.id,
+      sourceFields: graphic?.sourceFields,
+    },
   };
 }
 
@@ -353,6 +359,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         textColor: label.textColor,
       },
       index,
+      graphic: {
+        kind: 'label',
+        id: label.id,
+        sourceFields: {
+          ...label,
+        },
+      },
     }));
     index += 1;
   });
@@ -385,6 +398,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         width: line.width,
       },
       index,
+      graphic: {
+        kind: 'line',
+        id: line.id,
+        sourceFields: {
+          ...line,
+        },
+      },
     }));
     index += 1;
   });
@@ -419,6 +439,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         text: box.text,
       },
       index,
+      graphic: {
+        kind: 'box',
+        id: box.id,
+        sourceFields: {
+          ...box,
+        },
+      },
     }));
     index += 1;
   });
@@ -448,6 +475,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         rate: hist.rate,
       },
       index,
+      graphic: {
+        kind: 'profile',
+        id: hist.id,
+        sourceFields: {
+          ...hist,
+        },
+      },
     }));
     index += 1;
   });

@@ -423,6 +423,201 @@ describe('TradingView collector', () => {
     expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(result.dataset);
   });
 
+  it('preserves LuxAlgo ICT/SMC labels, zones, and lines as auditable structural features', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-structural-feature-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 501,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_down',
+                yLoc: 'price',
+                color: 16711680,
+                textColor: 16777215,
+              },
+              {
+                id: 502,
+                x: 1,
+                y: 5498.75,
+                text: 'CHoCH',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 503,
+                x: 2,
+                y: 5504,
+                text: 'MSS',
+                style: 'label_down',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 601,
+                name: 'bullish_order_block',
+                x1: 0,
+                y1: 5502.5,
+                x2: 1,
+                y2: 5498.75,
+                text: 'Bullish OB',
+                bgColor: 32768,
+                color: 65280,
+              },
+              {
+                id: 602,
+                name: 'fair_value_gap',
+                x1: 1,
+                y1: 5504,
+                x2: 2,
+                y2: 5501.5,
+                text: 'FVG',
+                bgColor: 255,
+                color: 255,
+              },
+            ],
+            lines: [
+              {
+                id: 701,
+                name: 'structure_break_line',
+                x1: 0,
+                y1: 5502.5,
+                x2: 2,
+                y2: 5502.5,
+                extend: 'none',
+                style: 'dashed',
+                color: 16711680,
+                width: 1,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: expect.stringContaining(`${luxAlgoIctSmc.id}:label:BOS:2026-06-25T13-30-00-000Z`),
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'BOS',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'label',
+          graphicId: 501,
+          sourceFields: expect.objectContaining({
+            x: 0,
+            y: 5502.5,
+            text: 'BOS',
+          }),
+          text: 'BOS',
+          price: 5502.5,
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'CHoCH',
+        value: expect.objectContaining({
+          graphicKind: 'label',
+          graphicId: 502,
+          sourceFields: expect.objectContaining({
+            text: 'CHoCH',
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'MSS',
+        value: expect.objectContaining({
+          graphicKind: 'label',
+          graphicId: 503,
+          sourceFields: expect.objectContaining({
+            text: 'MSS',
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'bullish_order_block',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'box',
+          graphicId: 601,
+          startTime: '2026-06-25T13:30:00.000Z',
+          endTime: '2026-06-25T13:35:00.000Z',
+          top: 5502.5,
+          bottom: 5498.75,
+          text: 'Bullish OB',
+          sourceFields: expect.objectContaining({
+            x1: 0,
+            x2: 1,
+            y1: 5502.5,
+            y2: 5498.75,
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'fair_value_gap',
+        eventTime: '2026-06-25T13:35:00.000Z',
+        availabilityTime: '2026-06-25T13:40:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'box',
+          graphicId: 602,
+          top: 5504,
+          bottom: 5501.5,
+          text: 'FVG',
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'line',
+        name: 'structure_break_line',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:40:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'line',
+          graphicId: 701,
+          startTime: '2026-06-25T13:30:00.000Z',
+          endTime: '2026-06-25T13:40:00.000Z',
+          startPrice: 5502.5,
+          endPrice: 5502.5,
+          sourceFields: expect.objectContaining({
+            x1: 0,
+            x2: 2,
+          }),
+        }),
+      }),
+    ]));
+
+    expect(dataset.features.map((feature) => feature.id)).not.toContain('501');
+    expect(dataset.features.map((feature) => feature.id)).not.toContain('601');
+  });
+
   it('collects allowlisted TradingView studies into the exported dataset', async () => {
     const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-study-'));
     const client = makeMockClient([
