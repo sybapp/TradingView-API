@@ -7,6 +7,7 @@ A dataset is a directory containing:
 - `manifest.json`
 - `bars.json`
 - `features.json`
+- optional `derivation-diagnostics.json`
 
 The collector writes this directory. The evaluator reads it. Backtests must not call TradingView live.
 
@@ -20,6 +21,7 @@ It exposes:
 - `run_smoke_backtest(dataset_path)`
 - `validate_strategy_spec(strategy_spec)`
 - `run_strategy_backtest(dataset_path, strategy_spec, cost_model, registry_path)`
+- `create_luxalgo_ict_smc_long_strategy_template(config=None)`
 - `generate_bounded_template_specs(templates, search_config)`
 - `run_bounded_strategy_search(dataset_path, templates, cost_model, registry_path, walk_forward, fitness_constraints, search_config, proposed_candidates=None)`
 - `reproduce_search_winner(search_registry_record_path)`
@@ -64,6 +66,14 @@ Nautilus Validation survivor exists. If no candidate survives, the search
 completes with no winner and may report only a diagnostic best rejected
 candidate. LLM-proposed candidates are accepted only as candidate specs and are
 validated before they can be evaluated or ranked.
+
+`create_luxalgo_ict_smc_long_strategy_template()` creates a bounded LuxAlgo
+ICT/SMC long template for datasets that contain derived `type: "signal"`
+features. Generated specs require a bullish structure-event signal and a
+bullish liquidity-zone confirmation signal for entry, use reverse bearish
+structure-event signals for exits, vary the LuxAlgo derivation/search
+parameters, and report each candidate's total trade count against the 30-trade
+comparison threshold in search registry artifacts.
 
 ## Manifest
 
@@ -123,6 +133,34 @@ When present, `manifest.session.sessions` records the derived RTH session struct
 
 Graphics must be represented as typed Structural Features rather than screenshots.
 
+Derived Candidate Signals are strategy-consumable features and are written to
+`features.json` as `type: "signal"` records. Derivation diagnostics are not
+strategy-consumable features and must not be written as diagnostics-only records
+inside `features.json`.
+
+## Feature Derivation Diagnostics
+
+`derivation-diagnostics.json` is an optional companion artifact for feature
+derivation results. Older datasets may omit it.
+
+When present, it contains:
+
+- `schemaVersion`: currently `1`
+- `rules`: derivation rule diagnostics
+
+Each rule diagnostic contains:
+
+- `rule`: derivation rule name
+- `version`: derivation rule version
+- `counts`: aggregate source, derived, and unresolved counts
+- `warnings`: human-readable warnings for non-blocking derivation issues
+- `examples`: representative unresolved examples
+
+The LuxAlgo ICT/SMC derivations record unresolved direction, invalid liquidity
+zone geometry, and missing provenance as diagnostics. These diagnostics do not
+abort dataset writing; they make derivation loss auditable while keeping
+`features.json` limited to structural features and candidate signals.
+
 ## Public API
 
 The JavaScript contract module is exported as `TradingView.datasetContract`:
@@ -144,14 +182,18 @@ When invalid, `errors` contains `{ "path": "...", "message": "..." }` records su
 The first TradingView Collector path is exported as `TradingView.collector`:
 
 - `collectEsRth5mDataset(options)`
+- `collectEsRth5mLuxAlgoIctSmcDataset(options)`
 - `buildEsRth5mDataset(options)`
 - `collectIndicatorStudies(options)`
 - `indicatorStudiesToFeatures(options)`
 - `periodsToRthBars(periods, options)`
 - `writeVersionedDatasetSync(datasetPath, dataset)`
 - `CURATED_INDICATOR_ALLOWLIST`
+- `LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST`
 
 `collectEsRth5mDataset(options)` collects the default curated indicator allowlist unless `includeIndicatorFeatures` is set to `false` or `indicatorStudies` are supplied directly. `buildEsRth5mDataset(options)` accepts optional `indicatorStudies` and `indicatorAllowlist` values. Allowlisted study periods are exported as plot features, and allowlisted study graphics are exported as typed Structural Features. Repainting-risk indicators use delayed availability times before the resulting records may be consumed as confirmed candidate signals.
+
+`collectEsRth5mLuxAlgoIctSmcDataset(options)` is an explicit opt-in smoke path for LuxAlgo ICT/SMC. It keeps LuxAlgo ICT/SMC out of `CURATED_INDICATOR_ALLOWLIST`, uses the TradingView `widgetdata` backend, and records `manifest.collection.kind: "luxalgo-ict-smc-opt-in"` with the backend in the written Versioned Dataset.
 
 To write an ES RTH 5-minute continuous futures dataset:
 

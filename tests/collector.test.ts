@@ -311,6 +311,1232 @@ describe('TradingView collector', () => {
     expect(features).toEqual([]);
   });
 
+  it('keeps LuxAlgo ICT/SMC out of the default curated indicator allowlist', () => {
+    const luxAlgoIds = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST
+      .map((indicator) => indicator.id);
+
+    expect(TradingView.collector.CURATED_INDICATOR_ALLOWLIST.map((indicator) => indicator.id))
+      .not.toEqual(expect.arrayContaining(luxAlgoIds));
+  });
+
+  it('collects LuxAlgo ICT/SMC through the opt-in widgetdata smoke path', async () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-luxalgo-'));
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const client = makeMockClient([
+      {
+        time: Date.parse('2026-06-25T13:30:00.000Z') / 1000,
+        open: 5500.25,
+        max: 5502.5,
+        min: 5498.75,
+        close: 5501,
+        volume: 1200,
+      },
+      {
+        time: Date.parse('2026-06-25T13:35:00.000Z') / 1000,
+        open: 5501,
+        max: 5503,
+        min: 5500.5,
+        close: 5502.25,
+        volume: 980,
+      },
+    ], {}, {
+      [luxAlgoIctSmc.id]: {
+        graphic: {
+          labels: [
+            {
+              id: 41,
+              x: 0,
+              y: 5502.5,
+              text: 'BOS',
+              style: 'label_down',
+            },
+          ],
+          boxes: [
+            {
+              id: 42,
+              name: 'bullish_order_block',
+              x1: 0,
+              y1: 5502.5,
+              x2: 1,
+              y2: 5498.75,
+              text: 'Bullish OB',
+            },
+          ],
+        },
+      },
+    });
+    let clientOptions;
+
+    const result = await TradingView.collector.collectEsRth5mLuxAlgoIctSmcDataset({
+      createClient: (options) => {
+        clientOptions = options;
+        return client;
+      },
+      outputPath,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      minBars: 2,
+      timeoutMs: 1000,
+      resolveIndicator: (indicator) => Promise.resolve({ id: indicator.id }),
+    });
+
+    expect(clientOptions).toMatchObject({ server: 'widgetdata' });
+    expect(result.validation).toEqual({ valid: true, errors: [] });
+    expect(result.dataset.manifest.collection).toEqual({
+      kind: 'luxalgo-ict-smc-opt-in',
+      tradingViewBackend: 'widgetdata',
+      optIn: true,
+    });
+    expect(result.dataset.manifest.indicators).toEqual([
+      expect.objectContaining({
+        id: luxAlgoIctSmc.id,
+        name: 'LuxAlgo ICT/SMC',
+        version: '7',
+        repaintingRisk: 'repainting-risk',
+      }),
+    ]);
+    expect(result.dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'BOS',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          text: 'BOS',
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'bullish_order_block',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          top: 5502.5,
+          bottom: 5498.75,
+          text: 'Bullish OB',
+        }),
+      }),
+    ]));
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(result.dataset);
+  });
+
+  it('preserves LuxAlgo ICT/SMC labels, zones, and lines as auditable structural features', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-structural-feature-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 501,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_down',
+                yLoc: 'price',
+                color: 16711680,
+                textColor: 16777215,
+              },
+              {
+                id: 502,
+                x: 1,
+                y: 5498.75,
+                text: 'CHoCH',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 503,
+                x: 2,
+                y: 5504,
+                text: 'MSS',
+                style: 'label_down',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 601,
+                name: 'bullish_order_block',
+                x1: 0,
+                y1: 5502.5,
+                x2: 1,
+                y2: 5498.75,
+                text: 'Bullish OB',
+                bgColor: 32768,
+                color: 65280,
+              },
+              {
+                id: 602,
+                name: 'fair_value_gap',
+                x1: 1,
+                y1: 5504,
+                x2: 2,
+                y2: 5501.5,
+                text: 'FVG',
+                bgColor: 255,
+                color: 255,
+              },
+            ],
+            lines: [
+              {
+                id: 701,
+                name: 'structure_break_line',
+                x1: 0,
+                y1: 5502.5,
+                x2: 2,
+                y2: 5502.5,
+                extend: 'none',
+                style: 'dashed',
+                color: 16711680,
+                width: 1,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: expect.stringContaining(`${luxAlgoIctSmc.id}:label:BOS:2026-06-25T13-30-00-000Z`),
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'BOS',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'label',
+          graphicId: 501,
+          sourceFields: expect.objectContaining({
+            x: 0,
+            y: 5502.5,
+            text: 'BOS',
+          }),
+          text: 'BOS',
+          price: 5502.5,
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'CHoCH',
+        value: expect.objectContaining({
+          graphicKind: 'label',
+          graphicId: 502,
+          sourceFields: expect.objectContaining({
+            text: 'CHoCH',
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'MSS',
+        value: expect.objectContaining({
+          graphicKind: 'label',
+          graphicId: 503,
+          sourceFields: expect.objectContaining({
+            text: 'MSS',
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'bullish_order_block',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'box',
+          graphicId: 601,
+          startTime: '2026-06-25T13:30:00.000Z',
+          endTime: '2026-06-25T13:35:00.000Z',
+          top: 5502.5,
+          bottom: 5498.75,
+          text: 'Bullish OB',
+          sourceFields: expect.objectContaining({
+            x1: 0,
+            x2: 1,
+            y1: 5502.5,
+            y2: 5498.75,
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'fair_value_gap',
+        eventTime: '2026-06-25T13:35:00.000Z',
+        availabilityTime: '2026-06-25T13:40:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'box',
+          graphicId: 602,
+          top: 5504,
+          bottom: 5501.5,
+          text: 'FVG',
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'line',
+        name: 'structure_break_line',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:40:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: expect.objectContaining({
+          graphicKind: 'line',
+          graphicId: 701,
+          startTime: '2026-06-25T13:30:00.000Z',
+          endTime: '2026-06-25T13:40:00.000Z',
+          startPrice: 5502.5,
+          endPrice: 5502.5,
+          sourceFields: expect.objectContaining({
+            x1: 0,
+            x2: 2,
+          }),
+        }),
+      }),
+    ]));
+
+    expect(dataset.features.map((feature) => feature.id)).not.toContain('501');
+    expect(dataset.features.map((feature) => feature.id)).not.toContain('601');
+  });
+
+  it('derives directional LuxAlgo structure-event candidate signals only when direction is auditable', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-directional-signal-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 801,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 802,
+                x: 1,
+                y: 5500.5,
+                text: 'CHoCH',
+                style: 'label_down',
+                yLoc: 'price',
+              },
+              {
+                id: 803,
+                x: 2,
+                y: 5503.25,
+                text: 'MSS',
+                style: 'label_left',
+                yLoc: 'price',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+
+    const rawLuxAlgoFeatures = dataset.features.filter(
+      (feature) => feature.indicatorId === luxAlgoIctSmc.id && feature.type === 'label',
+    );
+    const derivedSignals = dataset.features.filter(
+      (feature) => feature.indicatorId === luxAlgoIctSmc.id && feature.type === 'signal',
+    );
+
+    expect(rawLuxAlgoFeatures).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'BOS',
+        value: expect.objectContaining({
+          graphicId: 801,
+          text: 'BOS',
+        }),
+      }),
+      expect.objectContaining({
+        name: 'CHoCH',
+        value: expect.objectContaining({
+          graphicId: 802,
+          text: 'CHoCH',
+        }),
+      }),
+      expect.objectContaining({
+        name: 'MSS',
+        value: expect.objectContaining({
+          graphicId: 803,
+          text: 'MSS',
+        }),
+      }),
+    ]));
+
+    expect(derivedSignals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'signal',
+        name: 'bullish_bos',
+        eventTime: '2026-06-25T13:30:00.000Z',
+        availabilityTime: '2026-06-25T13:35:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: true,
+        metadata: expect.objectContaining({
+          provenance: expect.objectContaining({
+            sourceFeatureIds: [
+              expect.stringContaining(`${luxAlgoIctSmc.id}:label:BOS:2026-06-25T13-30-00-000Z`),
+            ],
+            derivation: expect.objectContaining({
+              rule: 'luxalgo-structure-event-direction',
+              version: '1',
+            }),
+            directionEvidence: expect.objectContaining({
+              direction: 'bullish',
+              evidenceType: 'label_style',
+              evidenceValue: 'label_up',
+            }),
+          }),
+        }),
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'signal',
+        name: 'bearish_choch',
+        eventTime: '2026-06-25T13:35:00.000Z',
+        availabilityTime: '2026-06-25T13:40:00.000Z',
+        repaintingRisk: 'repainting-risk',
+        value: true,
+        metadata: expect.objectContaining({
+          provenance: expect.objectContaining({
+            sourceFeatureIds: [
+              expect.stringContaining(`${luxAlgoIctSmc.id}:label:CHoCH:2026-06-25T13-35-00-000Z`),
+            ],
+            derivation: expect.objectContaining({
+              rule: 'luxalgo-structure-event-direction',
+              version: '1',
+            }),
+            directionEvidence: expect.objectContaining({
+              direction: 'bearish',
+              evidenceType: 'label_style',
+              evidenceValue: 'label_down',
+            }),
+          }),
+        }),
+      }),
+    ]));
+    expect(derivedSignals).toHaveLength(2);
+    expect(derivedSignals.map((feature) => feature.name)).not.toContain('bullish_mss');
+    expect(derivedSignals.map((feature) => feature.name)).not.toContain('bearish_mss');
+  });
+
+  it('records derivation diagnostics without writing diagnostics-only features', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-derivation-diagnostics-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 851,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 852,
+                x: 1,
+                y: 5503.25,
+                text: 'MSS',
+                style: 'label_left',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 853,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: null,
+                x2: 2,
+                y2: 5500.25,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'label',
+        name: 'MSS',
+      }),
+      expect.objectContaining({
+        indicatorId: luxAlgoIctSmc.id,
+        type: 'box',
+        name: 'bullish_order_block',
+      }),
+    ]));
+    expect(dataset.features).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'diagnostic',
+      }),
+    ]));
+    expect(dataset.derivationDiagnostics).toEqual(expect.objectContaining({
+      schemaVersion: 1,
+      rules: expect.arrayContaining([
+        expect.objectContaining({
+          rule: 'luxalgo-structure-event-direction',
+          version: '1',
+          counts: expect.objectContaining({
+            sourceFeatures: 2,
+            derivedFeatures: 1,
+            unresolvedDirection: 1,
+          }),
+          warnings: expect.arrayContaining([
+            '1 structure event label could not be converted to a directional signal.',
+          ]),
+          examples: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'unresolved_direction',
+              indicatorId: luxAlgoIctSmc.id,
+              sourceFeatureId: expect.stringContaining(`${luxAlgoIctSmc.id}:label:MSS`),
+              featureType: 'label',
+              featureName: 'MSS',
+              eventTime: '2026-06-25T13:35:00.000Z',
+              reason: 'unsupported label style',
+              evidence: expect.objectContaining({
+                style: 'label_left',
+                text: 'MSS',
+                graphicId: 852,
+              }),
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          rule: 'luxalgo-liquidity-zone-entry',
+          version: '1',
+          counts: expect.objectContaining({
+            invalidZoneGeometry: 1,
+          }),
+          warnings: expect.arrayContaining([
+            '1 liquidity zone could not be used because its geometry was invalid.',
+          ]),
+          examples: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'invalid_zone_geometry',
+              indicatorId: luxAlgoIctSmc.id,
+              sourceFeatureId: expect.stringContaining(`${luxAlgoIctSmc.id}:box:bullish_order_block`),
+              featureType: 'box',
+              featureName: 'bullish_order_block',
+              reason: 'missing finite top or bottom',
+              evidence: expect.objectContaining({
+                top: null,
+                bottom: 5500.25,
+                graphicId: 853,
+              }),
+            }),
+          ]),
+        }),
+      ]),
+    }));
+  });
+
+  it('writes and reads derivation diagnostics as a companion artifact', () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-derivation-diagnostics-'));
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-derivation-diagnostics-write-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 861,
+                x: 0,
+                y: 5502.5,
+                text: 'MSS',
+                style: 'label_left',
+                yLoc: 'price',
+                color: 16711680,
+                textColor: 16777215,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    TradingView.collector.writeVersionedDatasetSync(outputPath, dataset);
+
+    expect(JSON.parse(
+      fs.readFileSync(path.join(outputPath, 'derivation-diagnostics.json'), 'utf8'),
+    )).toEqual(dataset.derivationDiagnostics);
+    expect(JSON.parse(fs.readFileSync(path.join(outputPath, 'features.json'), 'utf8'))).toEqual(
+      dataset.features,
+    );
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(dataset);
+  });
+
+  it('removes stale derivation diagnostics when the next dataset has none', () => {
+    const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-stale-derivation-diagnostics-'));
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const datasetWithDiagnostics = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-derivation-diagnostics-stale-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 871,
+                x: 0,
+                y: 5502.5,
+                text: 'MSS',
+                style: 'label_left',
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const datasetWithoutDiagnostics = TradingView.collector.buildEsRth5mDataset({
+      bars,
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'plain-dataset-after-diagnostics-fixture',
+      indicatorAllowlist: [],
+    });
+
+    TradingView.collector.writeVersionedDatasetSync(outputPath, datasetWithDiagnostics);
+    TradingView.collector.writeVersionedDatasetSync(outputPath, datasetWithoutDiagnostics);
+
+    expect(fs.existsSync(path.join(outputPath, 'derivation-diagnostics.json'))).toBe(false);
+    expect(TradingView.datasetContract.readDatasetSync(outputPath)).toEqual(
+      datasetWithoutDiagnostics,
+    );
+  });
+
+  it('derives a long entry candidate signal when a bullish structure event confirms a bullish liquidity zone touch', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-touch-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 901,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 902,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+
+    const entrySignal = dataset.features.find(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_touch_entry',
+    );
+
+    expect(entrySignal).toEqual(expect.objectContaining({
+      indicatorId: luxAlgoIctSmc.id,
+      type: 'signal',
+      eventTime: '2026-06-25T13:45:00.000Z',
+      availabilityTime: '2026-06-25T13:45:00.000Z',
+      value: true,
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          sourceFeatureIds: [
+            expect.stringContaining(`${luxAlgoIctSmc.id}:label:BOS:2026-06-25T13-30-00-000Z`),
+            expect.stringContaining(`${luxAlgoIctSmc.id}:box:bullish_order_block:2026-06-25T13-35-00-000Z`),
+          ],
+          derivation: expect.objectContaining({
+            rule: 'luxalgo-liquidity-zone-entry',
+            version: '1',
+          }),
+          structureEvent: expect.objectContaining({
+            name: 'BOS',
+            direction: 'bullish',
+            eventTime: '2026-06-25T13:30:00.000Z',
+          }),
+          selectedZone: expect.objectContaining({
+            kind: 'order_block',
+            direction: 'bullish',
+            top: 5500.4,
+            bottom: 5500.1,
+          }),
+          confirmation: expect.objectContaining({
+            mode: 'touch',
+            barTime: '2026-06-25T13:45:00.000Z',
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('derives a long entry candidate signal only after a bullish liquidity zone reclaim', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5502.25,
+          high: 5502.5,
+          low: 5500.25,
+          close: 5500.35,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5500.35,
+          high: 5503,
+          low: 5500.2,
+          close: 5502,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-reclaim-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'reclaim',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 4,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 911,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 912,
+                name: 'bullish_fair_value_gap',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish FVG',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const entrySignals = dataset.features.filter(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_reclaim_entry',
+    );
+
+    expect(entrySignals).toHaveLength(1);
+    expect(entrySignals[0]).toEqual(expect.objectContaining({
+      eventTime: '2026-06-25T13:50:00.000Z',
+      availabilityTime: '2026-06-25T13:50:00.000Z',
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          selectedZone: expect.objectContaining({
+            kind: 'fair_value_gap',
+          }),
+          confirmation: expect.objectContaining({
+            mode: 'reclaim',
+            barTime: '2026-06-25T13:50:00.000Z',
+          }),
+        }),
+      }),
+    }));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('does not derive a liquidity zone entry after the structure event wait expires', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5504,
+          low: 5502.75,
+          close: 5503,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5503,
+          high: 5503.25,
+          low: 5500.25,
+          close: 5502,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-expired-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 2,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 921,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 922,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.features).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'signal',
+        name: 'bullish_liquidity_zone_touch_entry',
+      }),
+    ]));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('does not derive a liquidity zone entry after close invalidates the bullish zone', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5499.75,
+          close: 5499.9,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5499.9,
+          high: 5503,
+          low: 5500.25,
+          close: 5502,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-invalidated-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'reclaim',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 4,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 931,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 932,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.features).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'signal',
+        name: 'bullish_liquidity_zone_reclaim_entry',
+      }),
+    ]));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('uses a bullish liquidity zone for at most one entry attempt', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+        {
+          time: '2026-06-25T13:50:00.000Z',
+          open: 5502,
+          high: 5503,
+          low: 5500.2,
+          close: 5502.25,
+          volume: 1100,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-single-use-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 941,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+              {
+                id: 942,
+                x: 2,
+                y: 5504,
+                text: 'MSS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 943,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const entrySignals = dataset.features.filter(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_touch_entry',
+    );
+
+    expect(entrySignals).toHaveLength(1);
+    expect(entrySignals[0].metadata.provenance.structureEvent).toEqual(expect.objectContaining({
+      name: 'BOS',
+    }));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('selects the confirmation zone using the configured liquidity zone preference', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-liquidity-zone-preference-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'prefer-FVG',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 951,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 952,
+                name: 'bullish_order_block',
+                x1: 1,
+                y1: 5500.4,
+                x2: 1,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+              {
+                id: 953,
+                name: 'bullish_fair_value_gap',
+                x1: 1,
+                y1: 5500.3,
+                x2: 1,
+                y2: 5500.15,
+                text: 'Bullish FVG',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const entrySignal = dataset.features.find(
+      (feature) => feature.type === 'signal'
+        && feature.name === 'bullish_liquidity_zone_touch_entry',
+    );
+
+    expect(entrySignal).toEqual(expect.objectContaining({
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          selectedZone: expect.objectContaining({
+            kind: 'fair_value_gap',
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('can confirm against a bullish liquidity zone that was already available when the structure event activates', () => {
+    const [luxAlgoIctSmc] = TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST;
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      bars: [
+        ...bars,
+        {
+          time: '2026-06-25T13:45:00.000Z',
+          open: 5503.25,
+          high: 5503.5,
+          low: 5500.25,
+          close: 5502,
+          volume: 900,
+        },
+      ],
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      datasetId: 'luxalgo-existing-liquidity-zone-entry-fixture',
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      candidateSignalDerivation: {
+        luxAlgoLiquidityZoneEntries: {
+          confirmationMode: 'touch',
+          zonePreference: 'nearest-any',
+          maxBarsAfterStructureEvent: 3,
+        },
+      },
+      indicatorStudies: [
+        {
+          indicatorId: luxAlgoIctSmc.id,
+          graphic: {
+            labels: [
+              {
+                id: 961,
+                x: 1,
+                y: 5503,
+                text: 'BOS',
+                style: 'label_up',
+                yLoc: 'price',
+              },
+            ],
+            boxes: [
+              {
+                id: 962,
+                name: 'bullish_order_block',
+                x1: 0,
+                y1: 5500.4,
+                x2: 0,
+                y2: 5500.1,
+                text: 'Bullish OB',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.features).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'signal',
+        name: 'bullish_liquidity_zone_touch_entry',
+        eventTime: '2026-06-25T13:45:00.000Z',
+        metadata: expect.objectContaining({
+          provenance: expect.objectContaining({
+            selectedZone: expect.objectContaining({
+              eventTime: '2026-06-25T13:30:00.000Z',
+            }),
+          }),
+        }),
+      }),
+    ]));
+  });
+
   it('collects allowlisted TradingView studies into the exported dataset', async () => {
     const outputPath = fs.mkdtempSync(path.join(os.tmpdir(), 'tv-es-rth-study-'));
     const client = makeMockClient([

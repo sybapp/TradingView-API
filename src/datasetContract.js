@@ -6,11 +6,18 @@ function readJsonSync(filePath) {
 }
 
 function readDatasetSync(datasetPath) {
-  return {
+  const dataset = {
     manifest: readJsonSync(path.join(datasetPath, 'manifest.json')),
     bars: readJsonSync(path.join(datasetPath, 'bars.json')),
     features: readJsonSync(path.join(datasetPath, 'features.json')),
   };
+  const derivationDiagnosticsPath = path.join(datasetPath, 'derivation-diagnostics.json');
+
+  if (fs.existsSync(derivationDiagnosticsPath)) {
+    dataset.derivationDiagnostics = readJsonSync(derivationDiagnosticsPath);
+  }
+
+  return dataset;
 }
 
 function isIsoTimestamp(value) {
@@ -41,6 +48,20 @@ function requireNumber(errors, value, pathName) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     addError(errors, pathName, 'must be a finite number');
   }
+}
+
+function requireBoolean(errors, value, pathName) {
+  if (typeof value !== 'boolean') {
+    addError(errors, pathName, 'must be a boolean');
+  }
+}
+
+function requireArray(errors, value, pathName) {
+  if (!Array.isArray(value)) {
+    addError(errors, pathName, 'must be an array');
+    return false;
+  }
+  return true;
 }
 
 function requireTimestamp(errors, value, pathName) {
@@ -301,7 +322,75 @@ function validateFeatures(features, errors) {
         'must be confirmed or repainting-risk',
       );
     }
+
+    if (feature.type === 'signal') {
+      requireBoolean(errors, feature.value, `${pathName}.value`);
+    }
+
+    if (feature.metadata !== undefined) {
+      validateFeatureMetadata(feature.metadata, errors, `${pathName}.metadata`);
+    }
   });
+}
+
+function validateFeatureMetadata(metadata, errors, pathName) {
+  if (!requireObject(errors, metadata, pathName)) return;
+
+  if (metadata.provenance === undefined) return;
+  if (!requireObject(errors, metadata.provenance, `${pathName}.provenance`)) return;
+
+  const { provenance } = metadata;
+
+  if (provenance.sourceFeatureIds !== undefined) {
+    if (!Array.isArray(provenance.sourceFeatureIds) || provenance.sourceFeatureIds.length === 0) {
+      addError(errors, `${pathName}.provenance.sourceFeatureIds`, 'must be a non-empty array');
+    } else {
+      provenance.sourceFeatureIds.forEach((featureId, index) => {
+        requireString(
+          errors,
+          featureId,
+          `${pathName}.provenance.sourceFeatureIds[${index}]`,
+        );
+      });
+    }
+  }
+
+  if (provenance.derivation !== undefined) {
+    if (requireObject(errors, provenance.derivation, `${pathName}.provenance.derivation`)) {
+      requireString(errors, provenance.derivation.rule, `${pathName}.provenance.derivation.rule`);
+      requireString(
+        errors,
+        provenance.derivation.version,
+        `${pathName}.provenance.derivation.version`,
+      );
+    }
+  }
+
+  if (provenance.directionEvidence !== undefined) {
+    if (
+      requireObject(
+        errors,
+        provenance.directionEvidence,
+        `${pathName}.provenance.directionEvidence`,
+      )
+    ) {
+      requireString(
+        errors,
+        provenance.directionEvidence.direction,
+        `${pathName}.provenance.directionEvidence.direction`,
+      );
+      requireString(
+        errors,
+        provenance.directionEvidence.evidenceType,
+        `${pathName}.provenance.directionEvidence.evidenceType`,
+      );
+      requireString(
+        errors,
+        provenance.directionEvidence.evidenceValue,
+        `${pathName}.provenance.directionEvidence.evidenceValue`,
+      );
+    }
+  }
 }
 
 function validateDataset(dataset) {
@@ -314,11 +403,63 @@ function validateDataset(dataset) {
   validateManifest(dataset.manifest, errors);
   validateBars(dataset.bars, errors, dataset.manifest?.bar?.interval, dataset.manifest?.session);
   validateFeatures(dataset.features, errors);
+  validateDerivationDiagnostics(dataset.derivationDiagnostics, errors);
 
   return {
     valid: errors.length === 0,
     errors,
   };
+}
+
+function validateDerivationDiagnostics(derivationDiagnostics, errors) {
+  if (derivationDiagnostics === undefined) return;
+  if (!requireObject(errors, derivationDiagnostics, 'derivationDiagnostics')) return;
+
+  if (derivationDiagnostics.schemaVersion !== 1) {
+    addError(errors, 'derivationDiagnostics.schemaVersion', 'must be 1');
+  }
+
+  if (!requireArray(errors, derivationDiagnostics.rules, 'derivationDiagnostics.rules')) return;
+
+  derivationDiagnostics.rules.forEach((ruleDiagnostics, ruleIndex) => {
+    const pathName = `derivationDiagnostics.rules[${ruleIndex}]`;
+    if (!requireObject(errors, ruleDiagnostics, pathName)) return;
+
+    requireString(errors, ruleDiagnostics.rule, `${pathName}.rule`);
+    requireString(errors, ruleDiagnostics.version, `${pathName}.version`);
+
+    if (requireObject(errors, ruleDiagnostics.counts, `${pathName}.counts`)) {
+      Object.entries(ruleDiagnostics.counts).forEach(([countName, countValue]) => {
+        requireNumber(errors, countValue, `${pathName}.counts.${countName}`);
+      });
+    }
+
+    if (requireArray(errors, ruleDiagnostics.warnings, `${pathName}.warnings`)) {
+      ruleDiagnostics.warnings.forEach((warning, warningIndex) => {
+        requireString(errors, warning, `${pathName}.warnings[${warningIndex}]`);
+      });
+    }
+
+    if (requireArray(errors, ruleDiagnostics.examples, `${pathName}.examples`)) {
+      ruleDiagnostics.examples.forEach((example, exampleIndex) => {
+        const examplePath = `${pathName}.examples[${exampleIndex}]`;
+        if (!requireObject(errors, example, examplePath)) return;
+
+        requireString(errors, example.kind, `${examplePath}.kind`);
+        requireString(errors, example.indicatorId, `${examplePath}.indicatorId`);
+        requireString(errors, example.sourceFeatureId, `${examplePath}.sourceFeatureId`);
+        requireString(errors, example.featureType, `${examplePath}.featureType`);
+        requireString(errors, example.featureName, `${examplePath}.featureName`);
+        requireString(errors, example.reason, `${examplePath}.reason`);
+        if (example.eventTime !== undefined) {
+          requireTimestamp(errors, example.eventTime, `${examplePath}.eventTime`);
+        }
+        if (example.evidence !== undefined) {
+          requireObject(errors, example.evidence, `${examplePath}.evidence`);
+        }
+      });
+    }
+  });
 }
 
 module.exports = {

@@ -48,6 +48,22 @@ const CURATED_INDICATOR_ALLOWLIST = [
   },
 ];
 
+const LUXALGO_ICT_SMC_COLLECTION_KIND = 'luxalgo-ict-smc-opt-in';
+const LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND = 'widgetdata';
+const LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE = 'luxalgo-structure-event-direction';
+const LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION = '1';
+const LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_RULE = 'luxalgo-liquidity-zone-entry';
+const LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_VERSION = '1';
+const DERIVATION_DIAGNOSTICS_FILE = 'derivation-diagnostics.json';
+const LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST = [
+  {
+    id: 'PUB;6daafb2cabe6419d98ae25229d2327f8',
+    name: 'LuxAlgo ICT/SMC',
+    version: '7',
+    repaintingRisk: 'repainting-risk',
+  },
+];
+
 function toIsoTimestamp(seconds) {
   return new Date(seconds * 1000).toISOString();
 }
@@ -292,6 +308,7 @@ function normalizeGraphicFeature({
   availabilityTime,
   value,
   index,
+  graphic,
 }) {
   return {
     id: featureId({
@@ -309,11 +326,526 @@ function normalizeGraphicFeature({
     eventTime,
     availabilityTime,
     repaintingRisk: indicator.repaintingRisk,
-    value,
+    value: {
+      ...value,
+      graphicKind: graphic?.kind,
+      graphicId: graphic?.id,
+      sourceFields: graphic?.sourceFields,
+    },
   };
 }
 
-function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
+function isLuxAlgoStructureEventName(name) {
+  return ['BOS', 'CHoCH', 'MSS'].includes(name);
+}
+
+function deriveDirectionEvidenceFromLabelStyle(style) {
+  if (style === 'label_up') {
+    return {
+      direction: 'bullish',
+      evidenceType: 'label_style',
+      evidenceValue: style,
+    };
+  }
+
+  if (style === 'label_down') {
+    return {
+      direction: 'bearish',
+      evidenceType: 'label_style',
+      evidenceValue: style,
+    };
+  }
+
+  return null;
+}
+
+function signalNameForStructureEvent(structureEventName, direction) {
+  return `${direction}_${structureEventName.toLowerCase()}`;
+}
+
+function signalNameForLiquidityZoneEntry(confirmationMode) {
+  return `bullish_liquidity_zone_${confirmationMode}_entry`;
+}
+
+function emptyDerivationRuleDiagnostics({ rule, version }) {
+  return {
+    rule,
+    version,
+    counts: {},
+    warnings: [],
+    examples: [],
+  };
+}
+
+function incrementDiagnosticCount(diagnostics, countName) {
+  diagnostics.counts[countName] = (diagnostics.counts[countName] || 0) + 1;
+}
+
+function addDiagnosticExample(diagnostics, example) {
+  if (diagnostics.examples.length >= 5) return;
+  diagnostics.examples.push(example);
+}
+
+function warnIfCount(diagnostics, countName, message) {
+  if ((diagnostics.counts[countName] || 0) > 0) {
+    diagnostics.warnings.push(message(diagnostics.counts[countName]));
+  }
+}
+
+function compactRuleDiagnostics(diagnostics) {
+  return {
+    ...diagnostics,
+    counts: Object.fromEntries(
+      Object.entries(diagnostics.counts).filter(([, value]) => value > 0),
+    ),
+  };
+}
+
+function createDerivationDiagnostics(rules) {
+  const includedRules = rules.filter((diagnostics) => (
+    Object.values(diagnostics.counts).some((value) => value > 0)
+    || diagnostics.warnings.length > 0
+    || diagnostics.examples.length > 0
+  ));
+
+  if (includedRules.length === 0) return undefined;
+
+  return {
+    schemaVersion: 1,
+    rules: includedRules.map(compactRuleDiagnostics),
+  };
+}
+
+function normalizeDerivedSignalFeature({
+  indicator,
+  eventTime,
+  availabilityTime,
+  signalName,
+  index,
+  sourceFeatureId,
+  directionEvidence,
+}) {
+  return {
+    id: featureId({
+      indicatorId: indicator.id,
+      type: 'signal',
+      name: signalName,
+      eventTime,
+      availabilityTime,
+      index,
+    }),
+    source: 'tradingview',
+    indicatorId: indicator.id,
+    type: 'signal',
+    name: signalName,
+    eventTime,
+    availabilityTime,
+    repaintingRisk: indicator.repaintingRisk,
+    value: true,
+    metadata: {
+      provenance: {
+        sourceFeatureIds: [sourceFeatureId],
+        derivation: {
+          rule: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE,
+          version: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION,
+        },
+        directionEvidence,
+      },
+    },
+  };
+}
+
+function deriveLuxAlgoStructureSignals({ indicator, features, startIndex }) {
+  const diagnostics = emptyDerivationRuleDiagnostics({
+    rule: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_RULE,
+    version: LUXALGO_STRUCTURE_SIGNAL_DERIVATION_VERSION,
+  });
+
+  if (indicator.id !== LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id) {
+    return { features: [], nextIndex: startIndex, diagnostics };
+  }
+
+  let index = startIndex;
+  const derivedFeatures = [];
+
+  features.forEach((feature) => {
+    if (feature.type !== 'label' || !isLuxAlgoStructureEventName(feature.name)) return;
+    incrementDiagnosticCount(diagnostics, 'sourceFeatures');
+
+    const directionEvidence = deriveDirectionEvidenceFromLabelStyle(feature.value?.style);
+    if (!directionEvidence) {
+      incrementDiagnosticCount(diagnostics, 'unresolvedDirection');
+      addDiagnosticExample(diagnostics, {
+        kind: 'unresolved_direction',
+        indicatorId: feature.indicatorId,
+        sourceFeatureId: feature.id,
+        featureType: feature.type,
+        featureName: feature.name,
+        eventTime: feature.eventTime,
+        reason: 'unsupported label style',
+        evidence: {
+          text: feature.value?.text,
+          style: feature.value?.style,
+          graphicId: feature.value?.graphicId,
+        },
+      });
+      return;
+    }
+
+    derivedFeatures.push(normalizeDerivedSignalFeature({
+      indicator,
+      eventTime: feature.eventTime,
+      availabilityTime: feature.availabilityTime,
+      signalName: signalNameForStructureEvent(feature.name, directionEvidence.direction),
+      index,
+      sourceFeatureId: feature.id,
+      directionEvidence,
+    }));
+    incrementDiagnosticCount(diagnostics, 'derivedFeatures');
+    index += 1;
+  });
+
+  warnIfCount(
+    diagnostics,
+    'unresolvedDirection',
+    (count) => `${count} structure event label could not be converted to a directional signal.`,
+  );
+
+  return {
+    features: derivedFeatures,
+    nextIndex: index,
+    diagnostics,
+  };
+}
+
+function barIndexByTime(bars) {
+  return new Map(bars.map((bar, index) => [bar.time, index]));
+}
+
+function luxAlgoLiquidityZoneEntryOptions(options) {
+  const source = options?.luxAlgoLiquidityZoneEntries;
+  if (!source) return null;
+
+  return {
+    confirmationMode: source.confirmationMode || 'touch',
+    zonePreference: source.zonePreference || 'nearest-any',
+    maxBarsAfterStructureEvent: source.maxBarsAfterStructureEvent ?? 12,
+  };
+}
+
+function liquidityZoneKind(feature) {
+  const name = String(feature.name || '').toLowerCase();
+  const text = String(feature.value?.text || '').toLowerCase();
+  const combined = `${name} ${text}`;
+
+  if (combined.includes('fvg') || combined.includes('fair_value_gap') || combined.includes('fair value gap')) {
+    return 'fair_value_gap';
+  }
+
+  if (combined.includes('ob') || combined.includes('order_block') || combined.includes('order block')) {
+    return 'order_block';
+  }
+
+  return null;
+}
+
+function bullishLiquidityZone(feature) {
+  if (feature.type !== 'box') return null;
+
+  const kind = liquidityZoneKind(feature);
+  if (!kind) return null;
+
+  const name = String(feature.name || '').toLowerCase();
+  const text = String(feature.value?.text || '').toLowerCase();
+  const combined = `${name} ${text}`;
+  if (!combined.includes('bull')) return null;
+
+  const top = feature.value?.top;
+  const bottom = feature.value?.bottom;
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
+
+  return {
+    feature,
+    kind,
+    direction: 'bullish',
+    top: Math.max(top, bottom),
+    bottom: Math.min(top, bottom),
+  };
+}
+
+function diagnoseBullishLiquidityZone(feature) {
+  if (feature.type !== 'box') return null;
+
+  const kind = liquidityZoneKind(feature);
+  if (!kind) return null;
+
+  const name = String(feature.name || '').toLowerCase();
+  const text = String(feature.value?.text || '').toLowerCase();
+  const combined = `${name} ${text}`;
+  if (!combined.includes('bull')) return null;
+
+  const top = feature.value?.top;
+  const bottom = feature.value?.bottom;
+  if (Number.isFinite(top) && Number.isFinite(bottom)) return null;
+
+  return {
+    kind: 'invalid_zone_geometry',
+    indicatorId: feature.indicatorId,
+    sourceFeatureId: feature.id,
+    featureType: feature.type,
+    featureName: feature.name,
+    eventTime: feature.eventTime,
+    reason: 'missing finite top or bottom',
+    evidence: {
+      top: feature.value?.top,
+      bottom: feature.value?.bottom,
+      graphicId: feature.value?.graphicId,
+    },
+  };
+}
+
+function bullishStructureEvent(feature) {
+  if (feature.type !== 'label' || !isLuxAlgoStructureEventName(feature.name)) return null;
+
+  const directionEvidence = deriveDirectionEvidenceFromLabelStyle(feature.value?.style);
+  if (directionEvidence?.direction !== 'bullish') return null;
+
+  return {
+    feature,
+    directionEvidence,
+  };
+}
+
+function isZoneInvalidatedByBar(zone, bar) {
+  return bar.close < zone.bottom;
+}
+
+function isZoneTouchedByBar(zone, bar) {
+  return bar.low <= zone.top && bar.high >= zone.bottom;
+}
+
+function isZoneReclaimedByBar(zone, bar) {
+  return isZoneTouchedByBar(zone, bar) && bar.close > zone.top;
+}
+
+function zoneConfirms({ zone, bar, confirmationMode }) {
+  if (confirmationMode === 'reclaim') return isZoneReclaimedByBar(zone, bar);
+  return isZoneTouchedByBar(zone, bar);
+}
+
+function selectLiquidityZone({ zones, structureFeature, confirmationBar, zonePreference }) {
+  const candidates = zones.filter((zone) => (
+    Date.parse(zone.feature.availabilityTime) <= Date.parse(confirmationBar.time)
+    && Date.parse(zone.feature.eventTime) <= Date.parse(confirmationBar.time)
+  ));
+
+  const preferred = candidates.filter((zone) => {
+    if (zonePreference === 'prefer-OB') return zone.kind === 'order_block';
+    if (zonePreference === 'prefer-FVG') return zone.kind === 'fair_value_gap';
+    return true;
+  });
+  const selectionPool = preferred.length > 0 ? preferred : candidates;
+
+  return selectionPool
+    .slice()
+    .sort((left, right) => (
+      Math.abs(confirmationBar.close - left.top) - Math.abs(confirmationBar.close - right.top)
+      || Date.parse(left.feature.availabilityTime) - Date.parse(right.feature.availabilityTime)
+      || left.feature.id.localeCompare(right.feature.id)
+    ))[0] || null;
+}
+
+function normalizeLiquidityZoneEntrySignalFeature({
+  indicator,
+  structureEvent,
+  zone,
+  confirmationBar,
+  confirmationMode,
+  index,
+}) {
+  return {
+    id: featureId({
+      indicatorId: indicator.id,
+      type: 'signal',
+      name: signalNameForLiquidityZoneEntry(confirmationMode),
+      eventTime: confirmationBar.time,
+      availabilityTime: confirmationBar.time,
+      index,
+    }),
+    source: 'tradingview',
+    indicatorId: indicator.id,
+    type: 'signal',
+    name: signalNameForLiquidityZoneEntry(confirmationMode),
+    eventTime: confirmationBar.time,
+    availabilityTime: confirmationBar.time,
+    repaintingRisk: indicator.repaintingRisk,
+    value: true,
+    metadata: {
+      provenance: {
+        sourceFeatureIds: [structureEvent.feature.id, zone.feature.id],
+        derivation: {
+          rule: LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_RULE,
+          version: LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_VERSION,
+        },
+        structureEvent: {
+          featureId: structureEvent.feature.id,
+          name: structureEvent.feature.name,
+          direction: 'bullish',
+          eventTime: structureEvent.feature.eventTime,
+          availabilityTime: structureEvent.feature.availabilityTime,
+          directionEvidence: structureEvent.directionEvidence,
+        },
+        selectedZone: {
+          featureId: zone.feature.id,
+          kind: zone.kind,
+          direction: zone.direction,
+          eventTime: zone.feature.eventTime,
+          availabilityTime: zone.feature.availabilityTime,
+          top: zone.top,
+          bottom: zone.bottom,
+        },
+        confirmation: {
+          mode: confirmationMode,
+          barTime: confirmationBar.time,
+          bar: {
+            open: confirmationBar.open,
+            high: confirmationBar.high,
+            low: confirmationBar.low,
+            close: confirmationBar.close,
+          },
+        },
+      },
+    },
+  };
+}
+
+function deriveLuxAlgoLiquidityZoneEntrySignals({
+  indicator,
+  features,
+  bars,
+  options,
+  startIndex,
+}) {
+  const entryOptions = luxAlgoLiquidityZoneEntryOptions(options);
+  const diagnostics = emptyDerivationRuleDiagnostics({
+    rule: LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_RULE,
+    version: LUXALGO_LIQUIDITY_ZONE_ENTRY_DERIVATION_VERSION,
+  });
+
+  if (!entryOptions || indicator.id !== LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id) {
+    return { features: [], nextIndex: startIndex, diagnostics };
+  }
+
+  let index = startIndex;
+  const usedZoneFeatureIds = new Set();
+  const derivedFeatures = [];
+  const indexes = barIndexByTime(bars);
+  const structures = features
+    .map(bullishStructureEvent)
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(left.feature.availabilityTime) - Date.parse(right.feature.availabilityTime));
+  diagnostics.counts.sourceStructureEvents = structures.length;
+
+  features
+    .map(diagnoseBullishLiquidityZone)
+    .filter(Boolean)
+    .forEach((example) => {
+      incrementDiagnosticCount(diagnostics, 'invalidZoneGeometry');
+      addDiagnosticExample(diagnostics, example);
+    });
+
+  const zones = features
+    .map(bullishLiquidityZone)
+    .filter(Boolean);
+  diagnostics.counts.sourceZones = zones.length;
+
+  structures.forEach((structureEvent) => {
+    const startBarIndex = indexes.get(structureEvent.feature.availabilityTime);
+    if (startBarIndex === undefined) {
+      incrementDiagnosticCount(diagnostics, 'missingProvenance');
+      addDiagnosticExample(diagnostics, {
+        kind: 'missing_provenance',
+        indicatorId: structureEvent.feature.indicatorId,
+        sourceFeatureId: structureEvent.feature.id,
+        featureType: structureEvent.feature.type,
+        featureName: structureEvent.feature.name,
+        eventTime: structureEvent.feature.eventTime,
+        reason: 'structure event availability time does not match a collected bar',
+        evidence: {
+          availabilityTime: structureEvent.feature.availabilityTime,
+        },
+      });
+      return;
+    }
+
+    const lastBarIndex = Math.min(
+      bars.length - 1,
+      startBarIndex + entryOptions.maxBarsAfterStructureEvent,
+    );
+
+    for (let barIndex = startBarIndex; barIndex <= lastBarIndex; barIndex += 1) {
+      const bar = bars[barIndex];
+      const activeZones = zones.filter((zone) => !usedZoneFeatureIds.has(zone.feature.id));
+      activeZones
+        .filter((zone) => isZoneInvalidatedByBar(zone, bar))
+        .forEach((zone) => usedZoneFeatureIds.add(zone.feature.id));
+
+      const selectableZone = selectLiquidityZone({
+        zones: activeZones.filter((zone) => (
+          !usedZoneFeatureIds.has(zone.feature.id)
+          && zoneConfirms({
+            zone,
+            bar,
+            confirmationMode: entryOptions.confirmationMode,
+          })
+        )),
+        structureFeature: structureEvent.feature,
+        confirmationBar: bar,
+        zonePreference: entryOptions.zonePreference,
+      });
+
+      if (!selectableZone) continue;
+
+      derivedFeatures.push(normalizeLiquidityZoneEntrySignalFeature({
+        indicator,
+        structureEvent,
+        zone: selectableZone,
+        confirmationBar: bar,
+        confirmationMode: entryOptions.confirmationMode,
+        index,
+      }));
+      incrementDiagnosticCount(diagnostics, 'derivedFeatures');
+      index += 1;
+      usedZoneFeatureIds.add(selectableZone.feature.id);
+      break;
+    }
+  });
+
+  warnIfCount(
+    diagnostics,
+    'invalidZoneGeometry',
+    (count) => `${count} liquidity zone could not be used because its geometry was invalid.`,
+  );
+  warnIfCount(
+    diagnostics,
+    'missingProvenance',
+    (count) => `${count} structure event could not be evaluated because required provenance was missing.`,
+  );
+
+  return {
+    features: derivedFeatures,
+    nextIndex: index,
+    diagnostics,
+  };
+}
+
+function normalizeGraphicFeatures({
+  study,
+  indicator,
+  bars,
+  startIndex,
+  candidateSignalDerivation,
+}) {
   let index = startIndex;
   const features = [];
   const graphic = study.graphic || {};
@@ -342,6 +874,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         textColor: label.textColor,
       },
       index,
+      graphic: {
+        kind: 'label',
+        id: label.id,
+        sourceFields: {
+          ...label,
+        },
+      },
     }));
     index += 1;
   });
@@ -374,6 +913,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         width: line.width,
       },
       index,
+      graphic: {
+        kind: 'line',
+        id: line.id,
+        sourceFields: {
+          ...line,
+        },
+      },
     }));
     index += 1;
   });
@@ -408,6 +954,13 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         text: box.text,
       },
       index,
+      graphic: {
+        kind: 'box',
+        id: box.id,
+        sourceFields: {
+          ...box,
+        },
+      },
     }));
     index += 1;
   });
@@ -437,21 +990,50 @@ function normalizeGraphicFeatures({ study, indicator, bars, startIndex }) {
         rate: hist.rate,
       },
       index,
+      graphic: {
+        kind: 'profile',
+        id: hist.id,
+        sourceFields: {
+          ...hist,
+        },
+      },
     }));
     index += 1;
   });
 
-  return { features, nextIndex: index };
+  const derivedSignalResult = deriveLuxAlgoStructureSignals({
+    indicator,
+    features,
+    startIndex: index,
+  });
+  features.push(...derivedSignalResult.features);
+  index = derivedSignalResult.nextIndex;
+  const diagnostics = [derivedSignalResult.diagnostics];
+
+  const liquidityZoneEntryResult = deriveLuxAlgoLiquidityZoneEntrySignals({
+    indicator,
+    features,
+    bars,
+    options: candidateSignalDerivation,
+    startIndex: index,
+  });
+  features.push(...liquidityZoneEntryResult.features);
+  index = liquidityZoneEntryResult.nextIndex;
+  diagnostics.push(liquidityZoneEntryResult.diagnostics);
+
+  return { features, nextIndex: index, diagnostics };
 }
 
 function indicatorStudiesToFeatures({
   studies = [],
   bars = [],
   allowlist = CURATED_INDICATOR_ALLOWLIST,
+  candidateSignalDerivation,
 } = {}) {
   const byId = allowlistById(allowlist);
   let index = 0;
   const features = [];
+  const diagnostics = [];
 
   studies.forEach((study) => {
     const indicator = byId.get(normalizeStudyId(study));
@@ -471,16 +1053,24 @@ function indicatorStudiesToFeatures({
       indicator,
       bars,
       startIndex: index,
+      candidateSignalDerivation,
     });
     features.push(...graphicResult.features);
     index = graphicResult.nextIndex;
+    diagnostics.push(...graphicResult.diagnostics);
   });
 
-  return features.sort((left, right) => (
+  const sortedFeatures = features.sort((left, right) => (
     Date.parse(left.availabilityTime) - Date.parse(right.availabilityTime)
     || Date.parse(left.eventTime) - Date.parse(right.eventTime)
     || left.id.localeCompare(right.id)
   ));
+
+  Object.defineProperty(sortedFeatures, 'derivationDiagnostics', {
+    value: createDerivationDiagnostics(diagnostics),
+    enumerable: false,
+  });
+  return sortedFeatures;
 }
 
 function defaultResolveIndicator(indicator) {
@@ -562,6 +1152,8 @@ function buildEsRthDataset({
   datasetId,
   indicatorAllowlist = CURATED_INDICATOR_ALLOWLIST,
   indicatorStudies = [],
+  candidateSignalDerivation,
+  collection,
 } = {}) {
   const collectedAt = now instanceof Date ? now : new Date(now);
   const session = {
@@ -571,6 +1163,12 @@ function buildEsRthDataset({
     end: defaults.sessionEnd,
     flatBeforeCloseMinutes: defaults.flatBeforeCloseMinutes,
   };
+  const features = indicatorStudiesToFeatures({
+    studies: indicatorStudies,
+    bars,
+    allowlist: indicatorAllowlist,
+    candidateSignalDerivation,
+  });
 
   return {
     manifest: {
@@ -601,13 +1199,11 @@ function buildEsRthDataset({
         },
       },
       indicators: indicatorAllowlist.map((indicator) => ({ ...indicator })),
+      ...(collection ? { collection: { ...collection } } : {}),
     },
     bars,
-    features: indicatorStudiesToFeatures({
-      studies: indicatorStudies,
-      bars,
-      allowlist: indicatorAllowlist,
-    }),
+    features,
+    derivationDiagnostics: features.derivationDiagnostics,
   };
 }
 
@@ -634,6 +1230,12 @@ function writeVersionedDatasetSync(outputPath, dataset) {
   writeJsonSync(path.join(outputPath, 'manifest.json'), dataset.manifest);
   writeJsonSync(path.join(outputPath, 'bars.json'), dataset.bars);
   writeJsonSync(path.join(outputPath, 'features.json'), dataset.features);
+  const derivationDiagnosticsPath = path.join(outputPath, DERIVATION_DIAGNOSTICS_FILE);
+  if (dataset.derivationDiagnostics) {
+    writeJsonSync(derivationDiagnosticsPath, dataset.derivationDiagnostics);
+  } else if (fs.existsSync(derivationDiagnosticsPath)) {
+    fs.unlinkSync(derivationDiagnosticsPath);
+  }
 }
 
 function waitForChartBars(chart, { minBars, timeoutMs }) {
@@ -672,14 +1274,19 @@ async function collectEsRthDataset({
   indicatorAllowlist = CURATED_INDICATOR_ALLOWLIST,
   indicatorStudies = [],
   includeIndicatorFeatures = true,
+  candidateSignalDerivation,
   resolveIndicator = defaultResolveIndicator,
+  tradingViewBackend = 'data',
+  collection,
 } = {}) {
   if (!outputPath) throw new Error('outputPath is required');
 
-  const client = createClient ? createClient() : new Client({
+  const clientOptions = {
     token: process.env.SESSION,
     signature: process.env.SIGNATURE,
-  });
+    server: tradingViewBackend,
+  };
+  const client = createClient ? createClient(clientOptions) : new Client(clientOptions);
   const chart = new client.Session.Chart();
 
   try {
@@ -707,6 +1314,8 @@ async function collectEsRthDataset({
       now,
       indicatorAllowlist,
       indicatorStudies: collectedIndicatorStudies,
+      candidateSignalDerivation,
+      collection,
     });
     const validation = datasetContract.validateDataset(dataset);
 
@@ -735,6 +1344,21 @@ async function collectEsRth5mDataset(options = {}) {
   });
 }
 
+async function collectEsRth5mLuxAlgoIctSmcDataset(options = {}) {
+  return collectEsRthDataset({
+    ...options,
+    defaults: ES_RTH_5M_DEFAULTS,
+    buildDataset: buildEsRth5mDataset,
+    indicatorAllowlist: LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+    tradingViewBackend: LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND,
+    collection: {
+      kind: LUXALGO_ICT_SMC_COLLECTION_KIND,
+      tradingViewBackend: LUXALGO_ICT_SMC_TRADINGVIEW_BACKEND,
+      optIn: true,
+    },
+  });
+}
+
 async function collectEsRth15mDataset(options = {}) {
   return collectEsRthDataset({
     ...options,
@@ -745,6 +1369,7 @@ async function collectEsRth15mDataset(options = {}) {
 
 module.exports = {
   collectEsRth5mDataset,
+  collectEsRth5mLuxAlgoIctSmcDataset,
   collectEsRth15mDataset,
   buildEsRth5mDataset,
   buildEsRth15mDataset,
@@ -753,4 +1378,5 @@ module.exports = {
   periodsToRthBars,
   writeVersionedDatasetSync,
   CURATED_INDICATOR_ALLOWLIST,
+  LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
 };

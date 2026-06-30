@@ -1,0 +1,3 @@
+# Start LuxAlgo zone retest with long-only FVG and internal OB
+
+The first real-data LuxAlgo ICT/SMC strategy should enter from a retest of extracted bullish FVG or bullish internal order-block zones, not directly from structure-change labels. A valid long entry requires the bar to touch the zone and reclaim above the zone top, uses a zone-bottom stop with a small tick buffer and maximum risk cap, searches an R-multiple target while retaining reverse-structure, max-bars, and RTH-flat exits, and is only considered worth further research if walk-forward validation on the real one-month ES RTH 5m dataset produces enough trades and robust window-level results.

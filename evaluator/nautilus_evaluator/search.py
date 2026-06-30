@@ -27,6 +27,8 @@ from .strategy_spec import validate_strategy_spec
 
 
 JsonObject = Dict[str, Any]
+LUXALGO_ICT_SMC_INDICATOR_ID = "PUB;6daafb2cabe6419d98ae25229d2327f8"
+TRADE_COMPARISON_THRESHOLD = 30
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,23 @@ class StrategyTemplate:
     template_id: str
     base_spec: Mapping[str, Any]
     choices: Mapping[str, Sequence[Any]]
+
+
+@dataclass(frozen=True)
+class LuxAlgoIctSmcLongTemplateConfig:
+    template_id: str = "luxalgo-ict-smc-long"
+    indicator_id: str = LUXALGO_ICT_SMC_INDICATOR_ID
+    event_types: Sequence[str] = ("bos", "choch", "mss")
+    zone_types: Sequence[str] = ("order_block", "fair_value_gap")
+    zone_preferences: Sequence[str] = ("nearest-any", "prefer-OB", "prefer-FVG")
+    confirmation_modes: Sequence[str] = ("touch", "reclaim")
+    max_bars_after_structure_event: Sequence[int] = (6, 12, 24)
+    cooldown_bars_after_exit: Sequence[int] = (0, 3, 6)
+    stop_loss_ticks: Sequence[int] = (8, 12, 16)
+    max_bars_in_trade: Sequence[int] = (12, 24, 48)
+    take_profit_ticks: int = 100
+    flat_before_close_minutes: int = 5
+    quantity: int = 1
 
 
 @dataclass(frozen=True)
@@ -95,6 +114,90 @@ def generate_bounded_template_specs(
         if len(candidates) >= search_config.max_candidates:
             break
     return candidates
+
+
+def create_luxalgo_ict_smc_long_strategy_template(
+    config: LuxAlgoIctSmcLongTemplateConfig = LuxAlgoIctSmcLongTemplateConfig(),
+) -> StrategyTemplate:
+    """Build a bounded long template for LuxAlgo ICT/SMC signal features."""
+    base_spec = {
+        "schemaVersion": 1,
+        "strategyId": config.template_id,
+        "description": (
+            "LuxAlgo ICT/SMC long template: bullish structure event plus "
+            "bullish liquidity-zone confirmation, reverse bearish structure exit."
+        ),
+        "parameters": {
+            "templateId": config.template_id,
+            "indicatorId": config.indicator_id,
+            "liquidityZoneType": "order_block",
+            "zonePreference": "nearest-any",
+            "confirmationMode": "touch",
+            "maxBarsAfterStructureEvent": 12,
+        },
+        "entryRules": [
+            _signal_rule(config.indicator_id, "bullish_bos"),
+            _signal_rule(
+                config.indicator_id,
+                "bullish_liquidity_zone_touch_entry",
+                metadata={
+                    "provenance": {
+                        "selectedZone": {"kind": "order_block"},
+                    },
+                },
+                max_bars_after_structure_event=12,
+                zone_preference="nearest-any",
+            ),
+        ],
+        "exits": {
+            "maxBarsInTrade": 24,
+            "reverseSignalRules": [
+                _signal_rule(config.indicator_id, "bearish_bos"),
+            ],
+        },
+        "sizing": {"type": "fixed", "quantity": config.quantity},
+        "riskControls": {
+            "intradayFlat": True,
+            "flatBeforeCloseMinutes": config.flat_before_close_minutes,
+            "stopLossTicks": 12,
+            "takeProfitTicks": config.take_profit_ticks,
+            "cooldownBarsAfterExit": 0,
+        },
+        "tunableParameters": {
+            "eventTypes": list(config.event_types),
+            "zoneTypes": list(config.zone_types),
+            "zonePreferences": list(config.zone_preferences),
+            "confirmationModes": list(config.confirmation_modes),
+            "maxBarsAfterStructureEvent": list(config.max_bars_after_structure_event),
+            "cooldownBarsAfterExit": list(config.cooldown_bars_after_exit),
+            "stopLossTicks": list(config.stop_loss_ticks),
+            "maxBarsInTrade": list(config.max_bars_in_trade),
+        },
+    }
+    return StrategyTemplate(
+        template_id=config.template_id,
+        base_spec=base_spec,
+        choices={
+            "entryRules.0.feature.name": [
+                f"bullish_{event_type.lower()}"
+                for event_type in config.event_types
+            ],
+            "entryRules.1.feature.name": [
+                f"bullish_liquidity_zone_{mode}_entry"
+                for mode in config.confirmation_modes
+            ],
+            "entryRules.1.feature.metadata.provenance.selectedZone.kind": list(config.zone_types),
+            "entryRules.1.feature.maxBarsAfterStructureEvent": list(config.max_bars_after_structure_event),
+            "entryRules.1.feature.zonePreference": list(config.zone_preferences),
+            "exits.reverseSignalRules.0.feature.name": [
+                f"bearish_{event_type.lower()}"
+                for event_type in config.event_types
+            ],
+            "riskControls.cooldownBarsAfterExit": list(config.cooldown_bars_after_exit),
+            "riskControls.stopLossTicks": list(config.stop_loss_ticks),
+            "exits.maxBarsInTrade": list(config.max_bars_in_trade),
+        },
+    )
 
 
 def run_bounded_strategy_search(
@@ -502,8 +605,50 @@ def _template_candidate_specs(template: StrategyTemplate) -> List[JsonObject]:
         for path, value in zip(paths, values):
             _set_path(candidate, path, value)
             candidate["parameters"][path.replace(".", "_")] = value
+            _sync_template_parameter(candidate, path, value)
         candidates.append(candidate)
     return candidates
+
+
+def _signal_rule(
+    indicator_id: str,
+    name: str,
+    *,
+    metadata: Optional[Mapping[str, Any]] = None,
+    max_bars_after_structure_event: Optional[int] = None,
+    zone_preference: Optional[str] = None,
+) -> JsonObject:
+    feature: JsonObject = {
+        "indicatorId": indicator_id,
+        "type": "signal",
+        "name": name,
+    }
+    if metadata is not None:
+        feature["metadata"] = dict(metadata)
+    if max_bars_after_structure_event is not None:
+        feature["maxBarsAfterStructureEvent"] = max_bars_after_structure_event
+    if zone_preference is not None:
+        feature["zonePreference"] = zone_preference
+    return {
+        "type": "feature_equals",
+        "feature": feature,
+        "value": True,
+        "side": "long",
+    }
+
+
+def _sync_template_parameter(candidate: JsonObject, path: str, value: Any) -> None:
+    if path == "entryRules.1.feature.metadata.provenance.selectedZone.kind":
+        candidate["parameters"]["liquidityZoneType"] = value
+    elif path == "entryRules.1.feature.maxBarsAfterStructureEvent":
+        candidate["parameters"]["maxBarsAfterStructureEvent"] = value
+    elif path == "entryRules.1.feature.zonePreference":
+        candidate["parameters"]["zonePreference"] = value
+    elif path == "entryRules.1.feature.name":
+        prefix = "bullish_liquidity_zone_"
+        suffix = "_entry"
+        if isinstance(value, str) and value.startswith(prefix) and value.endswith(suffix):
+            candidate["parameters"]["confirmationMode"] = value[len(prefix):-len(suffix)]
 
 
 def _sample_candidates(candidates: List[JsonObject], search_config: BoundedSearchConfig) -> List[JsonObject]:
@@ -822,12 +967,15 @@ def _snapshot_dataset(search_path: Path, dataset_path: Path) -> JsonObject:
 
 
 def _evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate) -> JsonObject:
+    trade_count = _candidate_trade_count(candidate)
     payload = {
         "candidateId": candidate.candidate_id,
         "strategyId": candidate.strategy_id,
         "strategySpec": candidate.strategy_spec,
         "optimizerPhase": candidate.optimizer_phase,
         "registryRecord": str(candidate.result.registry_record_path),
+        "totalTradeCount": trade_count,
+        "tradeComparison": _trade_comparison_to_json(trade_count),
         "fitness": _fitness_to_json(candidate.fitness),
     }
     if candidate.trial_number is not None:
@@ -838,6 +986,7 @@ def _evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate) -> JsonObj
 
 
 def _rejected_evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate, reasons: Sequence[str]) -> JsonObject:
+    trade_count = _candidate_trade_count(candidate)
     payload = {
         "candidateId": candidate.candidate_id,
         "strategyId": candidate.strategy_id,
@@ -845,6 +994,8 @@ def _rejected_evaluated_candidate_to_json(candidate: EvaluatedSearchCandidate, r
         "strategySpec": candidate.strategy_spec,
         "optimizerPhase": candidate.optimizer_phase,
         "registryRecord": str(candidate.result.registry_record_path),
+        "totalTradeCount": trade_count,
+        "tradeComparison": _trade_comparison_to_json(trade_count),
         "rejectionReasons": list(reasons),
         "fitness": _fitness_to_json(candidate.fitness),
     }
@@ -861,10 +1012,13 @@ def _winning_candidate_to_json(
 ) -> Optional[JsonObject]:
     if candidate is None:
         return None
+    trade_count = _candidate_trade_count(candidate)
     return {
         "candidateId": candidate.candidate_id,
         "strategyId": candidate.strategy_id,
         "strategySpec": candidate.strategy_spec,
+        "totalTradeCount": trade_count,
+        "tradeComparison": _trade_comparison_to_json(trade_count),
         "fitness": _fitness_to_json(candidate.fitness),
         "trialNumber": candidate.trial_number,
         "trialParameters": candidate.trial_parameters,
@@ -896,10 +1050,13 @@ def _best_rejected_candidate(
 def _best_rejected_candidate_to_json(candidate: Optional[EvaluatedSearchCandidate]) -> Optional[JsonObject]:
     if candidate is None:
         return None
+    trade_count = _candidate_trade_count(candidate)
     return {
         "candidateId": candidate.candidate_id,
         "strategyId": candidate.strategy_id,
         "strategySpec": candidate.strategy_spec,
+        "totalTradeCount": trade_count,
+        "tradeComparison": _trade_comparison_to_json(trade_count),
         "fitness": _fitness_to_json(candidate.fitness),
         "trialNumber": candidate.trial_number,
         "trialParameters": candidate.trial_parameters,
@@ -1019,6 +1176,22 @@ def _fitness_to_json(fitness) -> JsonObject:
     }
 
 
+def _candidate_trade_count(candidate: EvaluatedSearchCandidate) -> int:
+    return int(candidate.fitness.ranking_inputs.get("tradeCount", 0))
+
+
+def _trade_comparison_to_json(trade_count: int) -> JsonObject:
+    return {
+        "threshold": TRADE_COMPARISON_THRESHOLD,
+        "actual": trade_count,
+        "status": (
+            "eligible"
+            if trade_count >= TRADE_COMPARISON_THRESHOLD
+            else "below_threshold"
+        ),
+    }
+
+
 def _trial_parameters_from_spec(strategy_spec: Mapping[str, Any]) -> JsonObject:
     parameters = strategy_spec.get("parameters")
     if not isinstance(parameters, dict):
@@ -1035,6 +1208,7 @@ def _objective_value(result: WalkForwardBacktestResult) -> Optional[float]:
 
 
 def _evaluated_trial_to_json(candidate: EvaluatedSearchCandidate, source: str, trial: Any = None) -> JsonObject:
+    trade_count = _candidate_trade_count(candidate)
     return {
         "trialNumber": candidate.trial_number,
         "candidateId": candidate.candidate_id,
@@ -1045,6 +1219,8 @@ def _evaluated_trial_to_json(candidate: EvaluatedSearchCandidate, source: str, t
         "optunaParams": dict(trial.params) if trial is not None else {},
         "parameters": candidate.trial_parameters,
         "objectiveValue": candidate.objective_value,
+        "totalTradeCount": trade_count,
+        "tradeComparison": _trade_comparison_to_json(trade_count),
         "strategySpec": candidate.strategy_spec,
         "registryRecord": str(candidate.result.registry_record_path),
         "fitness": _fitness_to_json(candidate.fitness),

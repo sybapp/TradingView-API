@@ -202,6 +202,8 @@ class _StrategySpecNautilusAdapter:
                 self.submitted_orders: Dict[str, Dict[str, Any]] = {}
                 self.open_position: Optional[_OpenPosition] = None
                 self.entry_taken = False
+                self.allow_reentry = "cooldownBarsAfterExit" in spec.raw.get("riskControls", {})
+                self.last_exit_bar_index: Optional[int] = None
                 self.bars_by_ns = {timestamp_to_nanoseconds(item.time): item for item in dataset.bars}
                 self.bar_indices_by_ns = {
                     timestamp_to_nanoseconds(item.time): index for index, item in enumerate(dataset.bars)
@@ -213,10 +215,36 @@ class _StrategySpecNautilusAdapter:
 
             def on_bar(self, bar):
                 if self.pending_signal is not None:
+                    if (
+                        self.pending_signal.side == "sell"
+                        and self.pending_signal.reason == "exit:reverse-signal"
+                        and self.open_position is not None
+                    ):
+                        dataset_bar = self.bars_by_ns[bar.ts_event]
+                        stop_price = self.open_position.entry_price - (
+                            self.spec.risk_controls.stop_loss_ticks * self.tick_size
+                        )
+                        if dataset_bar.low <= stop_price:
+                            self.pending_signal = _PendingSignal(
+                                side="sell",
+                                quantity=self.open_position.quantity,
+                                reason="stop-loss",
+                                signal_bar_ns=bar.ts_event,
+                            )
                     self._submit_pending_signal(bar)
 
                 exit_reason = self._exit_reason(bar)
                 if self.open_position is not None and exit_reason is not None:
+                    if exit_reason == "exit:reverse-signal":
+                        if not self._next_bar_can_execute_before_flat(bar.ts_event):
+                            return
+                        self.pending_signal = _PendingSignal(
+                            side="sell",
+                            quantity=self.open_position.quantity,
+                            reason=exit_reason,
+                            signal_bar_ns=bar.ts_event,
+                        )
+                        return
                     self._submit_order(
                         side="sell",
                         quantity=self.open_position.quantity,
@@ -229,19 +257,22 @@ class _StrategySpecNautilusAdapter:
                 if self.pending_signal is not None or self.open_position is not None or self.entry_taken:
                     return
 
+                if not self._cooldown_complete(bar.ts_event):
+                    return
+
                 if not self._next_bar_can_execute_before_flat(bar.ts_event):
                     return
 
                 session = self._session_for_bar(bar.ts_event)
                 if session is None:
                     return
-                matched_rule = _matching_entry_rule(
+                if _all_entry_rules_match(
                     self.spec.entry_rules,
                     self.dataset.features,
+                    self.dataset.bars,
                     bar.ts_event,
                     earliest_feature_ns=session.first_bar_ns,
-                )
-                if matched_rule is not None:
+                ):
                     self.pending_signal = _PendingSignal(
                         side="buy",
                         quantity=self.spec.sizing.quantity,
@@ -294,6 +325,9 @@ class _StrategySpecNautilusAdapter:
                     )
                 else:
                     self.open_position = None
+                    if self.allow_reentry:
+                        self.entry_taken = False
+                    self.last_exit_bar_index = self.bar_indices_by_ns[execution_bar_ns]
 
             def _next_bar_can_execute_before_flat(self, current_bar_ns: int) -> bool:
                 next_bar = self._next_dataset_bar(current_bar_ns)
@@ -306,6 +340,15 @@ class _StrategySpecNautilusAdapter:
                     and next_session is not None
                     and current_session.session_id == next_session.session_id
                     and timestamp_to_nanoseconds(next_bar.time) < current_session.flat_at_ns
+                )
+
+            def _cooldown_complete(self, current_bar_ns: int) -> bool:
+                if self.last_exit_bar_index is None:
+                    return True
+                current_index = self.bar_indices_by_ns[current_bar_ns]
+                return (
+                    current_index - self.last_exit_bar_index
+                    > self.spec.risk_controls.cooldown_bars_after_exit
                 )
 
             def _exit_reason(self, bar) -> Optional[str]:
@@ -324,11 +367,22 @@ class _StrategySpecNautilusAdapter:
                 if dataset_bar.low <= stop_price:
                     return "stop-loss"
 
-                take_profit_price = position.entry_price + (
-                    self.spec.risk_controls.take_profit_ticks * self.tick_size
+                matched_exit_rule = _matching_feature_rule(
+                    self.spec.exits.reverse_signal_rules,
+                    self.dataset.features,
+                    self.dataset.bars,
+                    bar.ts_event,
+                    earliest_feature_ns=position.entry_bar_ns,
                 )
-                if dataset_bar.high >= take_profit_price:
-                    return "take-profit"
+                if matched_exit_rule is not None:
+                    return "exit:reverse-signal"
+
+                if not self.spec.exits.reverse_signal_rules:
+                    take_profit_price = position.entry_price + (
+                        self.spec.risk_controls.take_profit_ticks * self.tick_size
+                    )
+                    if dataset_bar.high >= take_profit_price:
+                        return "take-profit"
 
                 max_bars = self.spec.exits.max_bars_in_trade
                 if max_bars is not None:
@@ -419,13 +473,54 @@ def _nautilus_fill_model(cost_model: CostModel, nautilus: Mapping[str, Any]) -> 
     return nautilus["OneTickSlippageFillModel"]()
 
 
-def _matching_entry_rule(
+def _all_entry_rules_match(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
+    bars: List[DatasetBar],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
+    return bool(rules) and all(
+        _feature_rule_matches(
+            rule,
+            features,
+            bars,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        )
+        for rule in rules
+    )
+
+
+def _matching_feature_rule(
+    rules: List[FeatureEqualsEntryRule],
+    features: List[FeatureRecord],
+    bars: List[DatasetBar],
     bar_time_ns: int,
     *,
     earliest_feature_ns: Optional[int] = None,
 ) -> Optional[FeatureEqualsEntryRule]:
+    for rule in rules:
+        if _feature_rule_matches(
+            rule,
+            features,
+            bars,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        ):
+            return rule
+    return None
+
+
+def _feature_rule_matches(
+    rule: FeatureEqualsEntryRule,
+    features: List[FeatureRecord],
+    bars: List[DatasetBar],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
     available_features = [
         feature
         for feature in features
@@ -435,14 +530,84 @@ def _matching_entry_rule(
             or timestamp_to_nanoseconds(feature.availability_time) >= earliest_feature_ns
         )
     ]
-    for rule in rules:
-        if any(
-            feature.indicator_id == rule.indicator_id
-            and feature.name == rule.name
-            and feature.value == rule.value
-            for feature in available_features
-        ):
-            return rule
+    return any(
+        feature.indicator_id == rule.indicator_id
+        and (rule.feature_type is None or feature.type == rule.feature_type)
+        and feature.name == rule.name
+        and feature.value == rule.value
+        and _metadata_matches(rule.metadata, feature.metadata)
+        and _within_max_bars_after_structure_event(rule, feature, bars)
+        and _zone_preference_matches(rule, feature)
+        for feature in available_features
+    )
+
+
+def _metadata_matches(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> bool:
+    for key, expected_value in expected.items():
+        if key not in actual:
+            return False
+        actual_value = actual[key]
+        if isinstance(expected_value, dict):
+            if not isinstance(actual_value, dict):
+                return False
+            if not _metadata_matches(expected_value, actual_value):
+                return False
+        elif actual_value != expected_value:
+            return False
+    return True
+
+
+def _within_max_bars_after_structure_event(
+    rule: FeatureEqualsEntryRule,
+    feature: FeatureRecord,
+    bars: List[DatasetBar],
+) -> bool:
+    if rule.max_bars_after_structure_event is None:
+        return True
+    structure_time = (
+        feature.metadata
+        .get("provenance", {})
+        .get("structureEvent", {})
+        .get("availabilityTime")
+    )
+    if not isinstance(structure_time, str):
+        return False
+    structure_index = _bar_index_at_timestamp(bars, structure_time)
+    signal_index = _bar_index_at_ns(bars, timestamp_to_nanoseconds(feature.availability_time))
+    if structure_index is None or signal_index is None:
+        return False
+    bars_after_structure_event = signal_index - structure_index
+    return 0 <= bars_after_structure_event <= rule.max_bars_after_structure_event
+
+
+def _zone_preference_matches(rule: FeatureEqualsEntryRule, feature: FeatureRecord) -> bool:
+    if rule.zone_preference is None or rule.zone_preference == "nearest-any":
+        return True
+    selected_kind = (
+        feature.metadata
+        .get("provenance", {})
+        .get("selectedZone", {})
+        .get("kind")
+    )
+    if rule.zone_preference == "prefer-OB":
+        return selected_kind == "order_block"
+    if rule.zone_preference == "prefer-FVG":
+        return selected_kind == "fair_value_gap"
+    return False
+
+
+def _bar_index_at_timestamp(bars: List[DatasetBar], value: str) -> Optional[int]:
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _bar_index_at_ns(bars, timestamp_to_nanoseconds(timestamp))
+
+
+def _bar_index_at_ns(bars: List[DatasetBar], timestamp_ns: int) -> Optional[int]:
+    for index, bar in enumerate(bars):
+        if timestamp_to_nanoseconds(bar.time) == timestamp_ns:
+            return index
     return None
 
 

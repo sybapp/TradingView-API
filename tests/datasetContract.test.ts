@@ -208,4 +208,177 @@ describe('Versioned Dataset Contract', () => {
       ]),
     );
   });
+
+  it('accepts LuxAlgo structural feature metadata in the dataset contract', () => {
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      bars: [
+        {
+          time: '2026-06-25T13:30:00.000Z',
+          open: 5500.25,
+          high: 5502.5,
+          low: 5498.75,
+          close: 5501,
+          volume: 1200,
+        },
+        {
+          time: '2026-06-25T13:35:00.000Z',
+          open: 5501,
+          high: 5503,
+          low: 5500.5,
+          close: 5502.25,
+          volume: 980,
+        },
+      ],
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id,
+          graphic: {
+            labels: [
+              {
+                id: 1,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(dataset.features[0].value).toEqual(expect.objectContaining({
+      graphicKind: 'label',
+      graphicId: 1,
+      sourceFields: expect.objectContaining({
+        text: 'BOS',
+      }),
+    }));
+  });
+
+  it('accepts derived signal feature provenance metadata in the dataset contract', () => {
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      bars: [
+        {
+          time: '2026-06-25T13:30:00.000Z',
+          open: 5500.25,
+          high: 5502.5,
+          low: 5498.75,
+          close: 5501,
+          volume: 1200,
+        },
+        {
+          time: '2026-06-25T13:35:00.000Z',
+          open: 5501,
+          high: 5503,
+          low: 5500.5,
+          close: 5502.25,
+          volume: 980,
+        },
+      ],
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id,
+          graphic: {
+            labels: [
+              {
+                id: 1,
+                x: 0,
+                y: 5502.5,
+                text: 'BOS',
+                style: 'label_up',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const signalFeature = dataset.features.find((feature) => feature.type === 'signal');
+
+    expect(signalFeature).toEqual(expect.objectContaining({
+      value: true,
+      metadata: expect.objectContaining({
+        provenance: expect.objectContaining({
+          sourceFeatureIds: [expect.any(String)],
+          derivation: expect.objectContaining({
+            rule: 'luxalgo-structure-event-direction',
+            version: '1',
+          }),
+          directionEvidence: expect.objectContaining({
+            direction: 'bullish',
+          }),
+        }),
+      }),
+    }));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it('accepts optional derivation diagnostics companion data', () => {
+    const dataset = TradingView.collector.buildEsRth5mDataset({
+      now: new Date('2026-06-28T12:00:00.000Z'),
+      bars: [
+        {
+          time: '2026-06-25T13:30:00.000Z',
+          open: 5500.25,
+          high: 5502.5,
+          low: 5498.75,
+          close: 5501,
+          volume: 1200,
+        },
+        {
+          time: '2026-06-25T13:35:00.000Z',
+          open: 5501,
+          high: 5503,
+          low: 5500.5,
+          close: 5502.25,
+          volume: 980,
+        },
+      ],
+      indicatorAllowlist: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST,
+      indicatorStudies: [
+        {
+          indicatorId: TradingView.collector.LUXALGO_ICT_SMC_OPT_IN_ALLOWLIST[0].id,
+          graphic: {
+            labels: [
+              {
+                id: 1,
+                x: 0,
+                y: 5502.5,
+                text: 'MSS',
+                style: 'label_left',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(dataset.derivationDiagnostics).toEqual(expect.objectContaining({
+      schemaVersion: 1,
+      rules: expect.arrayContaining([
+        expect.objectContaining({
+          rule: 'luxalgo-structure-event-direction',
+          version: '1',
+          counts: expect.objectContaining({
+            unresolvedDirection: 1,
+          }),
+        }),
+      ]),
+    }));
+    expect(TradingView.datasetContract.validateDataset(dataset)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
 });

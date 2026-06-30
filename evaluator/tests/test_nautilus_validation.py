@@ -107,6 +107,128 @@ class NautilusValidationTests(unittest.TestCase):
         self.assertEqual(result.orders[-1].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
         self.assertEqual(result.position_quantity, 0)
 
+    def test_nautilus_validation_exits_long_on_reverse_signal_next_bar(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 104, high=104, low=104),
+                _bar("2026-06-25T13:45:00.000Z", 104, high=104, low=104),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 100,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_bos",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+            },
+            features=[
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                ),
+                _typed_feature(
+                    "signal-exit",
+                    "2026-06-25T13:35:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bearish_bos",
+                    value=True,
+                ),
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+            session_end="13:50",
+        )
+
+        self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "exit:reverse-signal"])
+        self.assertEqual(result.orders[-1].signal_bar_time.isoformat(), "2026-06-25T13:35:00+00:00")
+        self.assertEqual(result.orders[-1].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
+
+    def test_nautilus_validation_prioritizes_stop_loss_over_reverse_signal(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100.5, low=99.5),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100.5, low=99.5),
+                _bar("2026-06-25T13:40:00.000Z", 100, high=100.25, low=98.75),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 100,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_mss",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+            },
+            features=[
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                ),
+                _typed_feature(
+                    "signal-exit",
+                    "2026-06-25T13:35:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bearish_mss",
+                    value=True,
+                ),
+            ],
+            risk_overrides={"stopLossTicks": 4, "takeProfitTicks": 100},
+        )
+
+        self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "stop-loss"])
+
     def test_nautilus_validation_enforces_flat_before_close_per_session(self):
         result = _run_tiny_validation(
             bars=[
@@ -125,6 +247,57 @@ class NautilusValidationTests(unittest.TestCase):
         self.assertEqual(result.orders[-1].execution_bar_time.isoformat(), "2026-06-25T13:40:00+00:00")
         self.assertEqual(result.position_quantity, 0)
 
+    def test_nautilus_validation_uses_max_bars_when_reverse_signal_never_arrives(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100.5, low=99.5),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100.5, low=99.5),
+                _bar("2026-06-25T13:40:00.000Z", 100, high=100.5, low=99.5),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+                "exits": {
+                    "maxBarsInTrade": 1,
+                    "reverseSignalRules": [
+                        {
+                            "type": "feature_equals",
+                            "feature": {
+                                "indicatorId": "LUX;ICT_SMC",
+                                "type": "signal",
+                                "name": "bearish_choch",
+                            },
+                            "value": True,
+                            "side": "long",
+                        }
+                    ],
+                },
+            },
+            features=[
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                )
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+        )
+
+        self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "max-bars-in-trade"])
+
     def test_strategy_spec_validation_rejects_unsupported_fields(self):
         invalid_spec = {
             **HAND_WRITTEN_SPEC,
@@ -136,6 +309,161 @@ class NautilusValidationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "riskControls.trailingStopTicks is unsupported"):
             validate_strategy_spec(invalid_spec)
+
+    def test_nautilus_validation_honors_signal_feature_selector_type(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 104, high=104, low=104),
+                _bar("2026-06-25T13:45:00.000Z", 104, high=104, low=104),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ]
+            },
+            features=[
+                _typed_feature(
+                    "raw-plot",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="plot",
+                    name="bullish_bos",
+                    value=True,
+                ),
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:30:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                ),
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+            session_end="13:50",
+        )
+
+        self.assertEqual([order.reason for order in result.orders], ["entry:feature_equals", "intraday-flat-before-close"])
+        self.assertEqual(result.orders[0].signal_bar_time.isoformat(), "2026-06-25T13:30:00+00:00")
+
+    def test_nautilus_validation_honors_signal_provenance_selectors(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 100, high=100, low=100),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                            "maxBarsAfterStructureEvent": 1,
+                            "zonePreference": "prefer-FVG",
+                        },
+                        "value": True,
+                        "side": "long",
+                    }
+                ],
+            },
+            features=[
+                _typed_feature(
+                    "signal-entry",
+                    "2026-06-25T13:35:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_liquidity_zone_touch_entry",
+                    value=True,
+                    metadata={
+                        "provenance": {
+                            "structureEvent": {"availabilityTime": "2026-06-25T13:30:00.000Z"},
+                            "selectedZone": {"kind": "order_block"},
+                        }
+                    },
+                )
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+        )
+
+        self.assertEqual(result.orders, [])
+
+    def test_nautilus_validation_rejects_zone_signal_before_structure_provenance(self):
+        result = _run_tiny_validation(
+            bars=[
+                _bar("2026-06-25T13:30:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:35:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:40:00.000Z", 100, high=100, low=100),
+                _bar("2026-06-25T13:45:00.000Z", 100, high=100, low=100),
+            ],
+            spec_overrides={
+                "entryRules": [
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_bos",
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                    {
+                        "type": "feature_equals",
+                        "feature": {
+                            "indicatorId": "LUX;ICT_SMC",
+                            "type": "signal",
+                            "name": "bullish_liquidity_zone_touch_entry",
+                            "maxBarsAfterStructureEvent": 2,
+                        },
+                        "value": True,
+                        "side": "long",
+                    },
+                ],
+                "exits": {"maxBarsInTrade": 1},
+            },
+            features=[
+                _typed_feature(
+                    "structure-entry",
+                    "2026-06-25T13:40:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_bos",
+                    value=True,
+                ),
+                _typed_feature(
+                    "zone-entry",
+                    "2026-06-25T13:35:00.000Z",
+                    indicator_id="LUX;ICT_SMC",
+                    feature_type="signal",
+                    name="bullish_liquidity_zone_touch_entry",
+                    value=True,
+                    metadata={
+                        "provenance": {
+                            "structureEvent": {"availabilityTime": "2026-06-25T13:40:00.000Z"},
+                            "selectedZone": {"kind": "order_block"},
+                        }
+                    },
+                ),
+            ],
+            risk_overrides={"stopLossTicks": 100, "takeProfitTicks": 100},
+            session_end="13:50",
+        )
+
+        self.assertEqual(result.orders, [])
 
     def test_nautilus_validation_does_not_execute_pending_entry_across_rth_sessions(self):
         result = _run_tiny_validation(
@@ -329,16 +657,37 @@ def _bar(timestamp: str, open_price: float, *, high: float, low: float):
 
 
 def _direction_feature(feature_id: str, timestamp: str, value=1):
+    return _typed_feature(
+        feature_id,
+        timestamp,
+        indicator_id="STD;Supertrend",
+        feature_type="plot",
+        name="direction",
+        value=value,
+    )
+
+
+def _typed_feature(
+    feature_id: str,
+    timestamp: str,
+    *,
+    indicator_id: str,
+    feature_type: str,
+    name: str,
+    value,
+    metadata=None,
+):
     return {
         "id": feature_id,
         "source": "tradingview",
-        "indicatorId": "STD;Supertrend",
-        "type": "plot",
-        "name": "direction",
+        "indicatorId": indicator_id,
+        "type": feature_type,
+        "name": name,
         "eventTime": timestamp,
         "availabilityTime": timestamp,
         "repaintingRisk": "confirmed",
         "value": value,
+        **({"metadata": metadata} if metadata is not None else {}),
     }
 
 

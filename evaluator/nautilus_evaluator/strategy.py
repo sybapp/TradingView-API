@@ -395,13 +395,116 @@ def _run_compiled_strategy(
     pending_order: Optional[PendingOrder] = None
     position_quantity = 0
     flat_at_ns = _flat_at_nanoseconds(dataset, spec.risk_controls.flat_before_close_minutes)
+    entry_bar_price: Optional[int] = None
+    entry_bar_index: Optional[int] = None
+    entry_bar_time_ns: Optional[int] = None
+    entry_taken = False
+    allow_reentry = "cooldownBarsAfterExit" in spec.raw.get("riskControls", {})
+    last_exit_bar_index: Optional[int] = None
 
     for index, bar in enumerate(bars):
         if pending_order is not None:
+            if (
+                pending_order.side == "sell"
+                and pending_order.reason == "exit:reverse-signal"
+                and entry_bar_price is not None
+            ):
+                stop_price = entry_bar_price - round(
+                    spec.risk_controls.stop_loss_ticks * cost_model.tick_size * dataset.price_scale
+                )
+                if bar.low <= stop_price:
+                    pending_order = PendingOrder(
+                        side="sell",
+                        quantity=pending_order.quantity,
+                        reason="stop-loss",
+                        signal_bar=bar,
+                    )
             order = _execute_order(pending_order, bar, cost_model, dataset.price_scale)
             orders.append(order)
             position_quantity += order.quantity if order.side == "buy" else -order.quantity
+            if order.side == "buy":
+                entry_taken = True
+                entry_bar_price = bar.open
+                entry_bar_index = index
+                entry_bar_time_ns = bar.ts_event
+            else:
+                if allow_reentry:
+                    entry_taken = False
+                entry_bar_price = None
+                entry_bar_index = None
+                entry_bar_time_ns = None
+                last_exit_bar_index = index
             pending_order = None
+
+        if (
+            position_quantity > 0
+            and entry_bar_price is not None
+            and entry_bar_index is not None
+            and entry_bar_time_ns is not None
+        ):
+            stop_price = entry_bar_price - round(spec.risk_controls.stop_loss_ticks * cost_model.tick_size * dataset.price_scale)
+            if bar.low <= stop_price:
+                orders.append(
+                    _execute_order(
+                        PendingOrder(
+                            side="sell",
+                            quantity=position_quantity,
+                            reason="stop-loss",
+                            signal_bar=bar,
+                        ),
+                        bar,
+                        cost_model,
+                        dataset.price_scale,
+                    )
+                )
+                position_quantity = 0
+                if allow_reentry:
+                    entry_taken = False
+                entry_bar_price = None
+                entry_bar_index = None
+                entry_bar_time_ns = None
+                last_exit_bar_index = index
+                continue
+
+            matched_exit_rule = _matching_feature_rule(
+                spec.exits.reverse_signal_rules,
+                dataset.features,
+                bars,
+                bar.ts_event,
+                earliest_feature_ns=entry_bar_time_ns,
+            )
+            if matched_exit_rule is not None and index + 1 < len(bars) and bars[index + 1].ts_event < flat_at_ns:
+                pending_order = PendingOrder(
+                    side="sell",
+                    quantity=position_quantity,
+                    reason="exit:reverse-signal",
+                    signal_bar=bar,
+                )
+                continue
+
+            max_bars = spec.exits.max_bars_in_trade
+            if max_bars is not None and index - entry_bar_index >= max_bars:
+                orders.append(
+                    _execute_order(
+                        PendingOrder(
+                            side="sell",
+                            quantity=position_quantity,
+                            reason="max-bars-in-trade",
+                            signal_bar=bar,
+                        ),
+                        bar,
+                        cost_model,
+                        dataset.price_scale,
+                    )
+                )
+                position_quantity = 0
+                if allow_reentry:
+                    entry_taken = False
+                entry_bar_price = None
+                entry_bar_index = None
+                entry_bar_time_ns = None
+                last_exit_bar_index = index
+                continue
 
         if bar.ts_event >= flat_at_ns and position_quantity > 0:
             orders.append(
@@ -418,12 +521,27 @@ def _run_compiled_strategy(
                 )
             )
             position_quantity = 0
+            if allow_reentry:
+                entry_taken = False
+            entry_bar_price = None
+            entry_bar_index = None
+            entry_bar_time_ns = None
+            last_exit_bar_index = index
+            continue
 
         is_last_bar = index == len(bars) - 1
-        can_enter = not is_last_bar and position_quantity == 0 and pending_order is None
-        if can_enter and bars[index + 1].ts_event < flat_at_ns:
-            matched_rule = _matching_entry_rule(spec.entry_rules, dataset.features, bar.ts_event)
-            if matched_rule is not None:
+        can_enter = (
+            not is_last_bar
+            and position_quantity == 0
+            and pending_order is None
+            and not entry_taken
+        )
+        cooldown_complete = (
+            last_exit_bar_index is None
+            or index - last_exit_bar_index > spec.risk_controls.cooldown_bars_after_exit
+        )
+        if can_enter and cooldown_complete and bars[index + 1].ts_event < flat_at_ns:
+            if _all_feature_rules_match(spec.entry_rules, dataset.features, bars, bar.ts_event):
                 pending_order = PendingOrder(
                     side="buy",
                     quantity=spec.sizing.quantity,
@@ -454,24 +572,141 @@ def _run_compiled_strategy(
     return orders
 
 
-def _matching_entry_rule(
+def _all_feature_rules_match(
     rules: List[FeatureEqualsEntryRule],
     features: List[FeatureRecord],
+    bars: List[NautilusBarInput],
     bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
+    return bool(rules) and all(
+        _feature_rule_matches(
+            rule,
+            features,
+            bars,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        )
+        for rule in rules
+    )
+
+
+def _matching_feature_rule(
+    rules: List[FeatureEqualsEntryRule],
+    features: List[FeatureRecord],
+    bars: List[NautilusBarInput],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
 ) -> Optional[FeatureEqualsEntryRule]:
+    for rule in rules:
+        if _feature_rule_matches(
+            rule,
+            features,
+            bars,
+            bar_time_ns,
+            earliest_feature_ns=earliest_feature_ns,
+        ):
+            return rule
+    return None
+
+
+def _feature_rule_matches(
+    rule: FeatureEqualsEntryRule,
+    features: List[FeatureRecord],
+    bars: List[NautilusBarInput],
+    bar_time_ns: int,
+    *,
+    earliest_feature_ns: Optional[int] = None,
+) -> bool:
     available_features = [
         feature
         for feature in features
         if timestamp_to_nanoseconds(feature.availability_time) <= bar_time_ns
+        and (
+            earliest_feature_ns is None
+            or timestamp_to_nanoseconds(feature.availability_time) >= earliest_feature_ns
+        )
     ]
-    for rule in rules:
-        if any(
-            feature.indicator_id == rule.indicator_id
-            and feature.name == rule.name
-            and feature.value == rule.value
-            for feature in available_features
-        ):
-            return rule
+    return any(
+        feature.indicator_id == rule.indicator_id
+        and (rule.feature_type is None or feature.type == rule.feature_type)
+        and feature.name == rule.name
+        and feature.value == rule.value
+        and _metadata_matches(rule.metadata, feature.metadata)
+        and _within_max_bars_after_structure_event(rule, feature, bars)
+        and _zone_preference_matches(rule, feature)
+        for feature in available_features
+    )
+
+
+def _metadata_matches(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> bool:
+    for key, expected_value in expected.items():
+        if key not in actual:
+            return False
+        actual_value = actual[key]
+        if isinstance(expected_value, dict):
+            if not isinstance(actual_value, dict):
+                return False
+            if not _metadata_matches(expected_value, actual_value):
+                return False
+        elif actual_value != expected_value:
+            return False
+    return True
+
+
+def _within_max_bars_after_structure_event(
+    rule: FeatureEqualsEntryRule,
+    feature: FeatureRecord,
+    bars: List[NautilusBarInput],
+) -> bool:
+    if rule.max_bars_after_structure_event is None:
+        return True
+    structure_time = (
+        feature.metadata
+        .get("provenance", {})
+        .get("structureEvent", {})
+        .get("availabilityTime")
+    )
+    if not isinstance(structure_time, str):
+        return False
+    structure_index = _bar_index_at_timestamp(bars, structure_time)
+    signal_index = _bar_index_at_ns(bars, timestamp_to_nanoseconds(feature.availability_time))
+    if structure_index is None or signal_index is None:
+        return False
+    bars_after_structure_event = signal_index - structure_index
+    return 0 <= bars_after_structure_event <= rule.max_bars_after_structure_event
+
+
+def _zone_preference_matches(rule: FeatureEqualsEntryRule, feature: FeatureRecord) -> bool:
+    if rule.zone_preference is None or rule.zone_preference == "nearest-any":
+        return True
+    selected_kind = (
+        feature.metadata
+        .get("provenance", {})
+        .get("selectedZone", {})
+        .get("kind")
+    )
+    if rule.zone_preference == "prefer-OB":
+        return selected_kind == "order_block"
+    if rule.zone_preference == "prefer-FVG":
+        return selected_kind == "fair_value_gap"
+    return False
+
+
+def _bar_index_at_timestamp(bars: List[NautilusBarInput], value: str) -> Optional[int]:
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _bar_index_at_ns(bars, timestamp_to_nanoseconds(timestamp))
+
+
+def _bar_index_at_ns(bars: List[NautilusBarInput], timestamp_ns: int) -> Optional[int]:
+    for index, bar in enumerate(bars):
+        if bar.ts_event == timestamp_ns:
+            return index
     return None
 
 
