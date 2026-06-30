@@ -28,6 +28,22 @@ _Avoid_: Nautilus Validation, final backtest, production backtest
 A typed, time-aligned feature derived from TradingView indicator plots or graphics, such as a label event, trend line, price zone, or volume profile bin.
 _Avoid_: Screenshot feature, raw chart image
 
+**Structure Event**:
+A time-point market structure change inferred from an indicator graphic or plot, such as BOS, CHoCH, or MSS, that may become a candidate signal after availability and repainting risk are handled.
+_Avoid_: Price zone, support/resistance state, final strategy
+
+**Liquidity Zone**:
+A price region inferred from an indicator graphic, such as an order block or fair value gap, that may provide context, filtering, or risk placement for a candidate signal. A liquidity zone is not itself a point-in-time entry trigger.
+_Avoid_: Entry trigger, point-in-time signal, proven support
+
+**Zone Extraction**:
+The process of turning TradingView indicator graphics into typed liquidity zones with direction, kind, price bounds, and availability time. Zone Extraction must classify ambiguous graphics before a zone-retest strategy can rely on them.
+_Avoid_: Entry rule, raw box parsing, structure signal
+
+**Zone-Retest Entry**:
+A point-in-time entry candidate created when price returns to a previously extracted liquidity zone during its allowed lifetime. The zone provides the entry location; structure events may provide context but are not themselves the entry.
+_Avoid_: Structure-event entry, breakout chase, zone creation
+
 **Strategy Spec**:
 A constrained, structured description of a candidate strategy's entry rules, filters, exits, sizing, risk controls, and tunable parameters.
 _Avoid_: Arbitrary generated strategy code, free-form strategy script
